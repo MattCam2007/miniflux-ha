@@ -1,0 +1,5 @@
+{
+  "name": "Miniflux",
+  "render_readme": true,
+  "homeassistant": "2025.6.0"
+}
