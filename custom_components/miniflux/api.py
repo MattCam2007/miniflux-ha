@@ -160,14 +160,21 @@ class MinifluxClient:
     async def get_version(self) -> str | None:
         """Best-effort server version for device info. Tolerates older
         instances lacking /v1/version by falling back to /version; if
-        neither exists, returns None rather than failing setup over a
-        cosmetic field."""
+        neither exists, or the fallback responds with something unparseable
+        (R1 finding: a real instance's bare /version 302-redirects rather
+        than 404ing, and a followed redirect landing on a login/SPA page
+        would otherwise raise an uncaught JSONDecodeError here), returns
+        None rather than failing setup over a cosmetic field. A non-404
+        failure on /v1/version itself still propagates -- unlike a fallback
+        with nowhere further to fall back to, that's a real server problem
+        worth surfacing, not "this endpoint doesn't exist here."
+        """
         try:
             data = await self._request("GET", API_VERSION_PATH_V1)
         except errors.MinifluxNotFoundError:
             try:
                 data = await self._request("GET", API_VERSION_PATH_ROOT)
-            except errors.MinifluxNotFoundError:
+            except (errors.MinifluxError, json_module.JSONDecodeError):
                 return None
         if isinstance(data, dict):
             version = data.get("version")

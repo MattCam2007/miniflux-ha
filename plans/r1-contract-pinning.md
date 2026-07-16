@@ -141,6 +141,8 @@ ls -la tests/fixtures/webhook_capture/
 
 ### B4 — verify the signature scheme
 
+> **This is not your API key (`$TOK`).** It's a separate value Miniflux generates specifically when you save the webhook URL in B2, shown on that same Settings → Integrations → Webhook page (labeled **Webhook secret**). Reusing the API key here is an easy mistake — both are similar-looking hex strings you already have handy — but it silently produces a signature mismatch that looks exactly like "the scheme is wrong," when the scheme is actually fine and it's just the wrong key.
+
 ```bash
 export WHSECRET="paste-the-webhook-secret-from-B2"
 python3 - <<'PY'
@@ -228,5 +230,30 @@ Signature scheme confirmed HMAC-SHA256 hex over raw body?  yes / no  (from B4 co
 Any field-name surprises in feeds/entries vs the lists above? __________
 Any mutation returning non-2xx?   __________
 ```
+
+### Answered (2026-07-16 run) — see `plans/decisions-and-assumed-contract.md` for the full reconciliation
+
+```
+Miniflux version:                 2.3.2  (from the webhook delivery's User-Agent header)
+Auth: token (X-Auth-Token) or basic? token — confirmed via smoke test
+/v1/version present?              yes — /v1/version 200s; /version 302s (doesn't matter, v1 always answers)
+/v1/feeds/counters present?       yes
+Entries response has top-level `total`?  yes (700)
+Signature header name:            X-Miniflux-Signature — confirmed exact
+Event-type header name:           X-Miniflux-Event-Type — confirmed exact
+Signature scheme confirmed HMAC-SHA256 hex over raw body?  NOT YET — B4 was run with the API key
+                                   instead of the real webhook secret (easy mix-up, see the warning
+                                   added to B4 above). Captured signatures are valid 64-hex-char
+                                   SHA-256-length digests, so the scheme itself is very likely right —
+                                   re-run B4 with the actual secret from Miniflux's webhook settings
+                                   page to close this for good.
+Any field-name surprises in feeds/entries vs the lists above? One real, harmless one: webhook
+                                   new_entries' per-entry objects (inside "entries") have no nested
+                                   "feed" key — only the envelope's top-level "feed" does. Doesn't
+                                   affect the fired event (EntryCompact never reads those fields).
+Any mutation returning non-2xx?   No — all five Section C mutations returned 204.
+```
+
+**Only one thing left to fully close R1:** re-run B4 with the real webhook secret (Miniflux → Settings → Integrations → Webhook page — it's the value labeled **Webhook secret**, generated when the URL was saved in B2, not the API key). Paste back whether the computed and header signatures match, and the signature-scheme assumption in `const.py`/`signature.py` gets its final confirmation.
 
 With those, the implementer freezes `const.py` header/param constants, `normalize.py` field maps, and the Phase-1/Phase-2 fixtures — and the "written against assumptions" risk (R1) is closed.

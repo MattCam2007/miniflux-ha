@@ -67,32 +67,52 @@ API_TIMEOUT_SECONDS = 30
 API_GET_RETRY_DELAY_SECONDS = 0.5
 
 # --- Assumed Miniflux wire contract (plans/decisions-and-assumed-contract.md) ----
-# ASSUMED (R1): API-key auth header name.
+# R1 CONFIRMED (2026-07-16, live instance, Miniflux 2.3.2): API-key auth
+# header name -- the checklist's smoke test (GET /v1/me) succeeded with it.
 API_AUTH_HEADER = "X-Auth-Token"
 
-# ASSUMED (R1): version endpoint; falls back to ROOT if V1 404s.
+# R1 CONFIRMED: /v1/version returns 200 with real version content on a
+# current instance. The ROOT fallback path itself remains unexercised in
+# practice (v1 never 404s here, so it's never reached) -- but the same
+# instance's bare /version 302-redirects rather than 404ing, which is why
+# api.get_version() was hardened to treat a fallback that resolves to
+# unparseable content (e.g. a followed redirect landing on a login/SPA
+# page) the same as "endpoint absent," rather than letting a JSONDecodeError
+# escape and crash setup over a cosmetic field.
 API_VERSION_PATH_V1 = "/v1/version"
 API_VERSION_PATH_ROOT = "/version"
 
 API_PATH_ME = "/v1/me"
 API_PATH_FEEDS = "/v1/feeds"
-API_PATH_FEED_COUNTERS = "/v1/feeds/counters"  # ASSUMED (R1): presence
+API_PATH_FEED_COUNTERS = "/v1/feeds/counters"  # R1 CONFIRMED: present, keyed by string ids
 API_PATH_CATEGORIES = "/v1/categories"
-API_PATH_ENTRIES = "/v1/entries"
+API_PATH_ENTRIES = "/v1/entries"  # R1 CONFIRMED: response has a top-level `total`
 API_PATH_DISCOVER = "/v1/discover"
 API_PATH_EXPORT = "/v1/export"
 API_PATH_IMPORT = "/v1/import"
 API_PATH_USERS = "/v1/users"
 
-# ASSUMED (R1): published-date filter param names + unit (unix epoch seconds).
+# ASSUMED (R1) -- STILL OPEN: the R1 checklist's Section A tested
+# status/starred/search filters but not a published-date range, so these
+# param names + the unix-epoch-seconds unit remain unverified against a
+# real response.
 PARAM_PUBLISHED_AFTER = "published_after"
 PARAM_PUBLISHED_BEFORE = "published_before"
 
-# ASSUMED (R1): webhook signature + event-type header names.
+# R1 CONFIRMED: exact header names captured from two real deliveries
+# (save_entry, new_entries) -- both match exactly, including the event-type
+# values ("new_entries"/"save_entry" below) matching the body's own
+# redundant top-level "event_type" field.
 WEBHOOK_HEADER_SIGNATURE = "X-Miniflux-Signature"
 WEBHOOK_HEADER_EVENT_TYPE = "X-Miniflux-Event-Type"
 
-# ASSUMED (R1): signature is hex-encoded HMAC-SHA256 over the raw request body.
+# ASSUMED (R1) -- STRONGLY SUPPORTED, NOT YET FULLY CLOSED: captured
+# signatures are 64 hex characters (consistent with a SHA-256 digest
+# hex-encoded), but the one verification attempt used the wrong secret (the
+# Miniflux API key, not the webhook secret Miniflux generated when the
+# webhook URL was saved), so it couldn't confirm an exact match. Re-run
+# plans/r1-contract-pinning.md's B4 with the real webhook secret to close
+# this for good.
 WEBHOOK_SIGNATURE_ENCODING = "hex"
 
 WEBHOOK_EVENT_TYPE_NEW_ENTRIES = "new_entries"

@@ -277,6 +277,35 @@ class TestReadEndpoints:
         client = _client(session)
         assert await client.get_version() is None
 
+    async def test_get_version_root_fallback_redirects_to_non_json_returns_none(self):
+        """R1 finding: a real instance's bare /version 302-redirects rather
+        than 404ing. aiohttp follows redirects by default, so if /v1/version
+        is ever genuinely absent (unlike this instance) and the redirect
+        lands on non-JSON (login page/SPA shell), get_version must still
+        resolve to None -- a cosmetic device-info field can't be allowed to
+        crash entry setup with an uncaught JSONDecodeError."""
+        session = FakeSession(
+            [
+                FakeResponse(404, json_body={"error_message": "not found"}),
+                FakeResponse(200, text_body="<html>not json</html>"),
+            ]
+        )
+        client = _client(session)
+        assert await client.get_version() is None
+
+    async def test_get_version_root_fallback_server_error_returns_none(self):
+        """Unlike a non-404 on /v1/version itself (propagates -- see below),
+        a failure on the *fallback* has nowhere further to fall back to, so
+        it resolves to None like any other fallback failure."""
+        session = FakeSession(
+            [
+                FakeResponse(404, json_body={"error_message": "not found"}),
+                FakeResponse(500, json_body={"error_message": "boom"}),
+            ]
+        )
+        client = _client(session)
+        assert await client.get_version() is None
+
     async def test_get_version_propagates_non_404_errors(self):
         session = FakeSession([FakeResponse(500, json_body={"error_message": "boom"})])
         client = _client(session)
