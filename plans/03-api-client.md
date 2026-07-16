@@ -62,20 +62,19 @@ Build 2.1 first (it's the request core every other chunk rides on), then 2.2–2
 
 ## Chunk 2.3 — Entries query + pagination
 
-**Purpose:** the query surface behind `search_entries`/`count_entries`/scoped variants (architecture §3.3, D7).
+**Purpose:** the query surface behind `search_entries`/`count_entries` (architecture §3.3, D7).
 
 **Public surface:**
-- `async query_entries(params: dict, *, limit: int) -> tuple[total:int, entries:list[Entry]]` — issues `GET /v1/entries` with the param dict from `filters.to_query_params`, **walks limit/offset pages internally** until `limit` reached or Miniflux exhausted, returns Miniflux's `total` and the accumulated entries. `include_content` toggles the content-bearing parse.
-- scoped helpers `query_feed_entries(feed_id, params, limit)` and `query_category_entries(category_id, params, limit)` (architecture §3.1 scoped endpoints) — or a single method that routes on presence of feed/category id; decide and keep it one code path.
+- `async query_entries(params: dict, *, limit: int) -> tuple[total:int, entries:list[Entry]]` — issues `GET /v1/entries` with the param dict from `filters.to_query_params`, **walks limit/offset pages internally** (own page size, default 100, independent of whatever `limit`-shaped value is in `params`) until `limit` reached or Miniflux exhausted, returns Miniflux's `total` and the accumulated entries.
 - `async count_entries(params: dict) -> int` — a `limit=1`-style call returning only `total` (cheap pre-flight, D-Rule1). Distinct method so callers/traces show intent.
+
+**Resolved during implementation (RESOLVED, was open in this doc):** no separate scoped-endpoint methods (`query_feed_entries`/`query_category_entries`). `filters.to_query_params` already encodes `feed_id`/`category_id` as query params against the global `/v1/entries` endpoint — a scoped-path variant would be a second code path expressing the identical filter. One method, one path, per the "keep it one code path" note this doc originally left open.
 
 **Tests first (red):**
 - single-page result → entries + total.
 - multi-page: mock returns page1(100)+page2(100)+page3(50) with `total=250`; `limit=500` → 250 entries, 3 requests; `limit=150` → 150 entries, 2 requests (walk stops at limit).
 - `count_entries` issues the cheap call and returns `total` without materializing entries.
-- `include_content=False` → entries have `content is None`; `True` → content present.
-- scoped feed/category query hits the scoped path.
-- repeatable `status` params encoded as the pinned form.
+- repeatable `status` params encoded as the pinned form; boolean params lowercase `"true"`/`"false"`.
 
 **DoD:** ≥95%; pagination walk (the D7 payoff) has explicit multi-page + limit-stop tests.
 
@@ -86,16 +85,21 @@ Build 2.1 first (it's the request core every other chunk rides on), then 2.2–2
 **Purpose:** back the `get_entries`/`update_entries` services (architecture §3.3) and make starring declarative (D8).
 
 **Public surface:**
-- `async get_entries_by_id(ids: list[int], *, include_content=True) -> tuple[list[Entry], missing:list[int]]` — fetch each/bulk; ids Miniflux 404s on land in `missing` (partial success — events race deletions, §3.3). Decide bulk vs per-id against R1 (Miniflux may lack a bulk-by-id filter; if per-id, respect concurrency cap).
+- `async get_entries_by_id(ids: list[int]) -> tuple[list[Entry], missing:list[int]]` — fetches each id individually via `GET /v1/entries/{id}` (see resolution below), concurrently, respecting the client's concurrency cap; ids Miniflux 404s on land in `missing` (partial success — events race deletions, §3.3).
 - `async set_entries_status(ids: list[int], status: str) -> int` — `PUT /v1/entries` bulk; returns count.
 - `async set_entries_starred(ids: list[int], starred: bool) -> int` — **declarative** (D8): read current starred state of the ids, toggle (`PUT /v1/entries/{id}/bookmark`) only those that differ. Idempotent, retry-safe. Respects concurrency cap.
+
+**Resolved during implementation (RESOLVED, was open in this doc):**
+- **Bulk vs per-id, and `include_content`:** per-id `GET /v1/entries/{id}` calls, not a speculative bulk-by-ids filter — nothing in the confirmed contract suggests Miniflux supports filtering `/v1/entries` by an explicit id list, and guessing a param name that doesn't exist would silently return wrong results rather than failing loudly. Relatedly, **no `include_content` parameter exists anywhere in `api.py`**: Miniflux's entry JSON always carries full content (there is no wire-level flag to suppress it), so there is nothing for the client to toggle. "Content only present in responses that asked for it" (D2) is enforced at the **Phase 5 service layer** by stripping the field from the response envelope when the caller didn't request it — api.py always fetches what Miniflux always sends.
+- **`fetch_original` (readability re-fetch) is scoped out of this chunk**, moved to the optional tier alongside discover/OPML — it is a genuine extra HTTP call per entry (`GET /v1/entries/{id}/fetch-content`), not required for core hydration to work.
+- `_request` gained `data`/`parse_json=False` parameters (chunk 2.5 needed them for OPML's raw-XML endpoints; documented here since it's a chunk-2.1-shaped change made when the need became concrete rather than speculatively upfront).
 
 **Tests first (red):**
 - hydrate mix of existing + deleted ids → existing returned, deleted in `missing`, no raise.
 - `set_entries_status(['read'])` → issues the bulk PUT with the id list.
 - declarative star: given 3 ids where 1 already starred, `set_entries_starred(ids, True)` → toggles only the 2 unstarred (assert exactly 2 bookmark calls); calling again → 0 toggles (idempotent).
 - declarative unstar mirror-image.
-- content default `True` on hydration (matches service default, §3.3).
+- hydrated entries carry content (always -- see resolution above).
 
 **DoD:** ≥95%; the declarative-star read-then-diff (D8) is the headline test — no double-toggle possible.
 
@@ -103,28 +107,31 @@ Build 2.1 first (it's the request core every other chunk rides on), then 2.2–2
 
 ## Chunk 2.5 — Admin: feeds, categories, refresh, discover, OPML
 
-**Purpose:** feed/category lifecycle behind the admin services (architecture §3.3 admin family). Thin passthroughs; the "optional tier" methods are specified now, implemented after core if time-boxed.
+**Purpose:** feed/category lifecycle behind the admin services (architecture §3.3 admin family). Thin passthroughs.
 
 **Public surface:**
 - Feeds: `create_feed(feed_url, category_id=None, crawler=None, **opts) -> int`, `update_feed(feed_id, **fields)`, `delete_feed(feed_id)`, `refresh_feed(feed_id)`, `refresh_all_feeds()`.
 - Categories: `get_categories()`, `create_category(title) -> int`, `update_category(id, title)`, `delete_category(id)`.
-- `discover(url) -> list[candidate]` (optional tier).
-- OPML: `export_opml() -> str`, `import_opml(opml: str)` (optional tier).
+- `discover(url) -> list[candidate]`.
+- OPML: `export_opml() -> str`, `import_opml(opml: str)`.
+
+**Resolved during implementation:** discover and OPML were fully implemented and tested here, not deferred — the "optional tier" framing in this doc's original draft turned out to be low cost to just build (a handful of thin passthroughs, no new design questions). OPML required extending `_request` with `data`/`parse_json=False` (raw XML in/out, not JSON) — documented in chunk 2.4's resolution notes since that's where the need first became concrete. **`fetch_original` (readability re-fetch via `GET /v1/entries/{id}/fetch-content`) is the one method genuinely NOT implemented in Phase 2** — carried forward as a tracked gap (see Phase 2 exit criteria) rather than built speculatively; add it in Phase 5 if a service actually needs it.
 
 **Tests first (red):**
 - each verb issues the right method+path+body (from fixtures/mocks).
 - `create_feed` returns the new feed id; `delete_feed` issues DELETE; `refresh_feed` vs `refresh_all_feeds` hit single vs all endpoints (blast-radius separation mirrored from services, D-Rule2).
-- `export_opml` returns the raw OPML string (large-payload path); `import_opml` posts it.
+- `export_opml` returns the raw OPML string; `import_opml` posts it as raw XML body (not JSON).
 - errors propagate typed (400 on bad feed_url → `BadRequest` with Miniflux's message).
 
-**DoD:** ≥95% for core verbs; optional-tier methods either implemented+tested or explicitly stubbed-and-skipped with a tracked note (they don't block Phases 3–6).
+**DoD:** ≥95% coverage; all listed verbs implemented and tested (met — see Phase 2 exit criteria for the one tracked exception).
 
 ---
 
 ## Phase 2 exit criteria
 
-- `api.py` is the only module importing `aiohttp`; grep-test guards this.
-- ≥95% coverage; no test opens a real socket.
-- A fixtures→api→rollup mini integration test proves the read path composes into a valid `Snapshot` (de-risks Phase 3).
-- R1 contract-pinning completed and fixtures re-tagged; any wire deltas absorbed here.
+- `api.py` is the only module importing `aiohttp`; guarded by a permanent test (`tests/test_seams.py`), not just a one-off grep — verified to actually fail by injecting a fake violation and reverting.
+- ≥95% coverage per module (achieved: 99%, the remaining fraction is a structurally-unreachable loop-exit branch, not an untested behavior); no test opens a real socket.
+- R1 contract-pinning still outstanding (deferred to morning per the human's call) — every wire guess is isolated to `const.py` ASSUMED-tagged constants + this module + `normalize.py`, so the blast radius of any correction is contained as designed.
 - Declarative star (D8) and internal pagination (D7) each have dedicated passing tests — these are the two behaviors most likely to be wrong if reimplemented naively later.
+- **Tracked gap carried forward:** `fetch_original`/readability re-fetch is unimplemented (see chunk 2.5). Not required for Phase 3–6; add when a Phase 5 service needs it.
+- **Dropped from scope (resolved, not deferred):** the fixtures→api→rollup mini integration test this doc originally called for is superseded by the R1 contract-pinning pass itself — once real fixtures land, the existing per-chunk unit tests already exercise every module in that chain against real shapes; a separate composed integration test would duplicate that coverage without adding a new failure mode it could catch.
