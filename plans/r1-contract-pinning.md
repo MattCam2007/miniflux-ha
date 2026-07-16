@@ -2,17 +2,28 @@
 
 **Why:** the design confines every exact Miniflux wire detail (auth header, field names, `total`/pagination, `/v1/version` presence, `/v1/feeds/counters` presence, webhook header names + payload shapes + signature scheme) to `api.py` + `normalize.py` + fixtures. This checklist captures those from **your** instance into `tests/fixtures/`, so the Phase-2 client is written against real bytes, not assumptions.
 
-**Where to run:** any box that can reach Miniflux **and** has this repo checked out (commands write into `tests/fixtures/`). Run from the repo root. Everything below is copy-paste; you only edit the two `export` lines in Step 0.
+**Where to run:** any box that can reach Miniflux **and** has this repo checked out (commands write into `tests/fixtures/`). Run from the repo root — a machine on your LAN, since this instance (like the coding agent building this integration) is only reachable from inside your network, not from the internet. Everything below is copy-paste; you only edit one `export` line in Step 0.
 
 **Time:** ~10 min. Read-only Section A is safe. Section B needs a throwaway feed (reversible). Section C is optional and self-contained.
 
+### Your instance — already known (2026-07-16, from your `docker-compose.yml` + URL)
+
+These are filled in below so you don't have to re-derive them; nothing here needed a live query.
+
+- **Base URL:** `http://192.168.3.80:8080` — no trailing slash, no sub-path (you shared the `/unread` frontend route; the API base is everything before that). Plain `http://`, not `https://` — there's no TLS in front of this container, so **`verify_ssl` is moot for this instance** and the HA config flow's URL field should be entered exactly as `http://192.168.3.80:8080`.
+- **Deployment:** official `miniflux/miniflux:latest` Docker image, Postgres backend, port `8080` mapped straight through with no reverse proxy in between. This resolves R9 (sub-path/proxy topology) **for this instance**: none of that applies here — a bare host:port is the whole story.
+- **Auth scheme:** API key via `X-Auth-Token` (not Basic auth) — you generated a key rather than using the admin username/password, so the smoke test below is exercising the token path, which is what `api.py` is built against.
+- **Exact Miniflux version:** still unknown — `latest` is a mutable tag, so only your own instance's `/v1/version` response (Section A, first thing you check) tells us what actually got pulled. Don't skip that check even though the rest of this is filled in.
+
+**A note on the API key you already sent me:** it's real and I'm not writing it into this file — this doc gets committed to the repo, and a live credential doesn't belong in git history even in a personal project (see Step Z's reasoning, which already made this call before I got here). Paste it into the `export TOK=` line yourself, right before you run Step 0, so it only ever lives in your shell's environment.
+
 ---
 
-## Step 0 — set two variables (the only editing you do)
+## Step 0 — set your API key (the only editing you do)
 
 ```bash
-export MF="https://reader.example.lan"     # your Miniflux base URL, NO trailing slash (include any sub-path)
-export TOK="paste-your-api-key-here"        # Miniflux → Settings → API Keys → create one
+export MF="http://192.168.3.80:8080"        # your Miniflux base URL — filled in above, no trailing slash
+export TOK="paste-your-api-key-here"        # the key you already generated (Miniflux → Settings → API Keys) — not repeated in this file on purpose, see note above
 export FX="tests/fixtures"; mkdir -p "$FX"
 mf() { curl -sS -D "$FX/$1.headers" -o "$FX/$1.json" -H "X-Auth-Token: $TOK" "$MF$2"; echo "  saved $FX/$1.json"; }
 ```

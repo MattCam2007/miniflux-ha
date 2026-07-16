@@ -4,6 +4,8 @@
 
 **Confidence:** target instance is **latest Miniflux**, so the values below are High-confidence unless flagged. Treat 🟡 items as the most likely to need a morning fix.
 
+**Update (2026-07-16):** the real instance URL (`http://192.168.3.80:8080` — Docker, Postgres backend, no reverse proxy/sub-path, no TLS) is now filled into [`r1-contract-pinning.md`](./r1-contract-pinning.md)'s Step 0, so running the checklist is just pasting your API key into one `export` line and executing each block. The table below is still every value's *pre-checklist* guess — it gets edited (not this note) once you paste back the checklist's results.
+
 ---
 
 ## Locked decisions (this session)
