@@ -1,0 +1,11 @@
+{
+  "id": 12,
+  "title": "Uncategorized Feed",
+  "site_url": "https://misc.example.com",
+  "feed_url": "https://misc.example.com/feed.xml",
+  "checked_at": "2026-07-16T07:30:00Z",
+  "parsing_error_count": 0,
+  "parsing_error_message": "",
+  "disabled": false,
+  "category": null
+}

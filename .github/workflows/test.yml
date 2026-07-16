@@ -33,3 +33,4 @@ jobs:
           --cov-report=json
           --cov-report=term-missing
       - run: python scripts/check_coverage_floors.py
+      - run: python scripts/check_framework_freedom.py

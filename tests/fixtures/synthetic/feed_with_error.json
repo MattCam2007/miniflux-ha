@@ -1,0 +1,14 @@
+{
+  "id": 11,
+  "title": "Broken Feed",
+  "site_url": "https://broken.example.com",
+  "feed_url": "https://broken.example.com/feed.xml",
+  "checked_at": "2026-07-16T07:00:00Z",
+  "parsing_error_count": 5,
+  "parsing_error_message": "unable to parse feed: EOF",
+  "disabled": false,
+  "category": {
+    "id": 100,
+    "title": "News"
+  }
+}
