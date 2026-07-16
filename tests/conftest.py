@@ -166,3 +166,17 @@ def fake_client():
     as the real client (so it can't silently drift from api.py), each an
     AsyncMock configurable per-test via `.return_value`/`.side_effect`."""
     return create_autospec(MinifluxClient, instance=True)
+
+
+@pytest.fixture
+def coordinator(hass, mock_config_entry, fake_client):
+    """A real, unpolled MinifluxCoordinator. Tests inject state directly via
+    `coordinator.data = ...` / `.last_update_success = ...` rather than
+    running an actual poll cycle -- entity tests (Phase 4) and anything else
+    that only needs to render a given coordinator state, not exercise the
+    polling machinery itself (that's coordinator.py's own tests, Phase 3)."""
+    from datetime import timedelta
+
+    from custom_components.miniflux.coordinator import MinifluxCoordinator
+
+    return MinifluxCoordinator(hass, mock_config_entry, fake_client, timedelta(seconds=300))

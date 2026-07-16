@@ -1,11 +1,10 @@
 """The Miniflux integration: entry setup/unload/reload (architecture §1
 component map, D10).
 
-Scoped to what Phase 3 owns: client + coordinator lifecycle. Platform
-forwarding, service registration, and webhook registration are added here
-incrementally by Phases 4/5/6 as those modules land -- each phase's own
-tests cover its addition; this module's own tests (chunk 3.4) only cover
-what's built so far.
+Client + coordinator lifecycle (Phase 3) and platform forwarding (Phase 4).
+Service registration and webhook registration are added here incrementally
+by Phases 5/6 as those modules land -- each phase's own tests cover its
+addition; this module's own tests only cover what's built so far.
 """
 
 from __future__ import annotations
@@ -15,6 +14,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -29,6 +29,8 @@ from .const import (
 from .coordinator import MinifluxCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
 @dataclass
@@ -59,11 +61,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: MinifluxConfigEntry) -> 
     entry.runtime_data = MinifluxRuntimeData(client=client, coordinator=coordinator)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: MinifluxConfigEntry) -> bool:
-    return True
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: MinifluxConfigEntry) -> None:

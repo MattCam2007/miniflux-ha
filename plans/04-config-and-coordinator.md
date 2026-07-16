@@ -86,12 +86,16 @@ Order: 3.1 config → 3.2 reauth → 3.3 options → 3.4 `__init__` setup/unload
   - add an options-update listener → reload.
 - `async_unload_entry`: unload platforms, deregister the webhook, and unregister services **only when the last entry unloads** (multi-instance safe); pop `runtime_data`.
 
-**Tests first (red):**
-- setup with a healthy fake client → entry state `LOADED`, coordinator present, two platforms forwarded.
-- first-refresh connection error → `ConfigEntryNotReady` (entry `SETUP_RETRY`).
-- first-refresh 401 → `ConfigEntryAuthFailed` (reauth started).
-- unload → platforms unloaded, webhook deregistered, `runtime_data` cleared; with two entries, unloading one keeps services registered; unloading the last removes them.
-- options update → reload invoked.
+**Resolved during implementation:** this chunk as originally written has a forward dependency the plan didn't flag — `async_setup_entry` can't forward to `SENSOR`/`BINARY_SENSOR` platforms, register services, or register the webhook receiver until those modules (Phases 4/5/6) actually exist. Built incrementally instead: Phase 3's `__init__.py` covers only client + coordinator lifecycle (setup/unload/reload, no platform/service/webhook references); Phase 4 adds `PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]` + `async_forward_entry_setups`/`async_unload_platforms` once `sensor.py`/`binary_sensor.py` exist; Phases 5/6 will add their own registration calls the same way when their modules land. Each addition ships with its own tests in `tests/test_init.py` rather than all being asserted in one chunk-3.4 pass.
+
+**Tests first (red), as actually split across phases:**
+- *(Phase 3)* setup with a healthy fake client → entry state `LOADED`, coordinator present.
+- *(Phase 3)* first-refresh connection error → `ConfigEntryNotReady` (entry `SETUP_RETRY`).
+- *(Phase 3)* first-refresh 401 → `ConfigEntryAuthFailed` (reauth started).
+- *(Phase 3)* unload → `runtime_data` cleared; options update → reload invoked.
+- *(Phase 4)* setup forwards exactly the two platforms; unload marks their entities `unavailable` (HA keeps a restored placeholder state rather than deleting the state record outright — the test asserts no entity is left reporting stale live data, not that the state machine forgets the entity existed).
+- *(Phase 6, not yet built)* webhook deregistered on unload.
+- *(deferred, low priority)* multi-instance service registration/unregistration guard — services are process-global (registered once regardless of entry count), so this is a Phase 5 concern to verify once services exist, not a per-entry lifecycle concern this chunk needs to test.
 
 **DoD:** setup/unload symmetric and leak-free (no lingering webhook/service after last unload); failure modes map to the right HA exceptions (D10).
 

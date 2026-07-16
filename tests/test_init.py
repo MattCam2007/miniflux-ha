@@ -1,14 +1,14 @@
-"""Chunk 3.4 — __init__.py setup/unload/reload (architecture §1, D10).
+"""Chunks 3.4/4.x — __init__.py setup/unload/reload, now including platform
+forwarding (architecture §1, D10).
 
-Scoped to what Phase 3 owns: client + coordinator lifecycle. Platform
-forwarding (Phase 4), service registration (Phase 5), and webhook
-registration (Phase 6) are added to async_setup_entry incrementally as
-those modules land -- see plans/04-config-and-coordinator.md's chunk 3.4
-resolution note.
+Service registration (Phase 5) and webhook registration (Phase 6) are added
+to async_setup_entry incrementally as those modules land -- see
+plans/04-config-and-coordinator.md's chunk 3.4 resolution note.
 
 Goes through the real hass.config_entries.async_setup()/async_unload() flow
 (not a bare call to async_setup_entry) so entry state transitions
-(SETUP_RETRY, reauth-on-auth-failure) are exercised for real.
+(SETUP_RETRY, reauth-on-auth-failure) and entity forwarding are exercised
+for real.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
+from homeassistant.const import STATE_UNAVAILABLE
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.miniflux import errors
@@ -82,6 +83,19 @@ class TestSetup:
         assert result is True
         assert entry.state is ConfigEntryState.LOADED
         assert entry.runtime_data.coordinator is not None
+
+    async def test_setup_forwards_sensor_and_binary_sensor_platforms(self, hass):
+        entry = _make_entry(hass)
+        with _patched_client(feeds=[]):
+            await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+
+        entity_ids = set(hass.states.async_entity_ids())
+        assert any(e.startswith("sensor.") for e in entity_ids)
+        assert any(e.startswith("binary_sensor.") for e in entity_ids)
+        # Exactly the four entities from Phase 4, no more.
+        sensor_ids = {e for e in entity_ids if e.startswith(("sensor.", "binary_sensor."))}
+        assert len(sensor_ids) == 4
         assert entry.runtime_data.client is not None
 
     async def test_connection_error_sets_setup_retry(self, hass):
@@ -141,6 +155,33 @@ class TestUnload:
 
         assert result is True
         assert entry.state is ConfigEntryState.NOT_LOADED
+
+    async def test_unload_marks_entities_unavailable(self, hass):
+        """HA keeps a restored placeholder state after platform unload
+        rather than deleting the state record outright -- the correct
+        assertion is that no entity is left reporting stale live data,
+        not that the state machine forgets the entity ever existed."""
+        entry = _make_entry(hass)
+        with _patched_client(feeds=[]):
+            await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+            live_states = [
+                hass.states.get(e)
+                for e in hass.states.async_entity_ids()
+                if e.startswith(("sensor.", "binary_sensor."))
+            ]
+            assert live_states and all(s.state != STATE_UNAVAILABLE for s in live_states)
+
+            await hass.config_entries.async_unload(entry.entry_id)
+            await hass.async_block_till_done()
+
+        post_unload_states = [
+            hass.states.get(e)
+            for e in hass.states.async_entity_ids()
+            if e.startswith(("sensor.", "binary_sensor."))
+        ]
+        assert post_unload_states
+        assert all(s.state == STATE_UNAVAILABLE for s in post_unload_states)
 
 
 class TestReload:
