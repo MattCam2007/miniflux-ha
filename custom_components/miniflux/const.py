@@ -92,10 +92,14 @@ API_PATH_EXPORT = "/v1/export"
 API_PATH_IMPORT = "/v1/import"
 API_PATH_USERS = "/v1/users"
 
-# ASSUMED (R1) -- STILL OPEN: the R1 checklist's Section A tested
-# status/starred/search filters but not a published-date range, so these
-# param names + the unix-epoch-seconds unit remain unverified against a
-# real response.
+# ASSUMED (R1) -- the one item the checklist didn't exercise (Section A
+# tested status/starred/search filters but not a published-date range).
+# Low residual risk: matches Miniflux's documented public API and the exact
+# naming convention every other confirmed filter param already followed
+# (status/starred/search/category_id/feed_id all matched on the first try).
+# A wrong guess here would surface immediately and loudly (an unfiltered or
+# error response), not silently -- unlike the webhook signature, this was
+# never a trust-boundary risk.
 PARAM_PUBLISHED_AFTER = "published_after"
 PARAM_PUBLISHED_BEFORE = "published_before"
 
@@ -106,13 +110,10 @@ PARAM_PUBLISHED_BEFORE = "published_before"
 WEBHOOK_HEADER_SIGNATURE = "X-Miniflux-Signature"
 WEBHOOK_HEADER_EVENT_TYPE = "X-Miniflux-Event-Type"
 
-# ASSUMED (R1) -- STRONGLY SUPPORTED, NOT YET FULLY CLOSED: captured
-# signatures are 64 hex characters (consistent with a SHA-256 digest
-# hex-encoded), but the one verification attempt used the wrong secret (the
-# Miniflux API key, not the webhook secret Miniflux generated when the
-# webhook URL was saved), so it couldn't confirm an exact match. Re-run
-# plans/r1-contract-pinning.md's B4 with the real webhook secret to close
-# this for good.
+# R1 CONFIRMED (2026-07-16): re-ran plans/r1-contract-pinning.md's B4 with
+# the real webhook secret (the first attempt had used the API key by
+# mistake) -- all three captured deliveries' computed HMAC-SHA256 hex
+# digests matched their X-Miniflux-Signature header byte-for-byte.
 WEBHOOK_SIGNATURE_ENCODING = "hex"
 
 WEBHOOK_EVENT_TYPE_NEW_ENTRIES = "new_entries"

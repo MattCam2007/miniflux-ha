@@ -1,10 +1,10 @@
-# Locked Decisions & Assumed Miniflux Contract
+# Locked Decisions & Assumed Miniflux Contract (R1: CLOSED 2026-07-16)
 
-**Purpose:** unblock building **without** the R1 checklist. Every Miniflux wire detail below is a best-guess coded into `const.py` (+ `normalize.py`/`api.py`). In the morning, run [`r1-contract-pinning.md`](./r1-contract-pinning.md) and **diff its results against this file** — because all wire knowledge is confined to those modules, any correction is a one-file edit, not a rewrite.
+**Purpose (historical):** this file unblocked building **without** the R1 checklist by recording best-guesses for every Miniflux wire detail, coded into `const.py` (+ `normalize.py`/`api.py`). That checklist has now run to completion against a real instance (Miniflux **2.3.2**) and every load-bearing guess is confirmed — this file is kept as the record of what was assumed and how it was verified, not as an open task list.
 
-**Confidence:** target instance is **latest Miniflux**, so the values below are High-confidence unless flagged. Treat 🟡 items as the most likely to need a morning fix.
+**Confidence:** target instance is **latest Miniflux**, so the values below are High-confidence unless flagged. Treat 🟡 items as the most likely to need a morning fix. *(All 🟡 items below are now resolved except one explicitly low-risk exception — see the closing note.)*
 
-**Update (2026-07-16) — R1 checklist run, reconciled:** Sections A, B, and C all ran against the real instance (Miniflux **2.3.2**, confirmed via the webhook delivery's `User-Agent` header). Almost every guess below was exactly right — REST auth/endpoints/field names, both webhook header names, both event-type values, and all five tested mutation endpoints (all returned `204`, all already handled correctly by `api.py`). Rows below are updated in place to `Confirmed` where the checklist proved them; two genuinely remain open (see the watch-list at the bottom) — `published_after`/`published_before` were never exercised, and the webhook **signature encoding** is strongly supported (captured signatures are valid 64-hex-char SHA-256-length digests) but not yet an exact-match confirmation, because the one verification attempt used the Miniflux **API key** instead of the actual Miniflux-generated **webhook secret** — an easy re-run, not a wire-contract surprise. One real bug the exercise surfaced and fixed: `api.get_version()` could have raised an uncaught `JSONDecodeError` and crashed entry setup if `/v1/version` were ever absent *and* `/version`'s fallback redirected to non-JSON content (this instance's own bare `/version` returns a 302, confirming the redirect behavior is real) — hardened in `api.py`, covered by two new tests.
+**Update (2026-07-16) — R1 checklist run, reconciled, then closed:** Sections A, B, and C ran against the real instance, confirmed via the webhook delivery's `User-Agent` header. Every guess proved exactly right — REST auth/endpoints/field names, both webhook header names, both event-type values, all five tested mutation endpoints (all `204`, all already handled correctly by `api.py`), **and, on a second pass, the webhook signature scheme itself**: the first B4 attempt used the Miniflux API key instead of the real webhook secret (an easy mix-up — both are similar-looking hex strings), producing a mismatch that looked like a scheme problem but wasn't. Re-run with the actual secret from Miniflux's webhook settings page: all three captured deliveries' computed HMAC-SHA256 hex digests matched their `X-Miniflux-Signature` header byte-for-byte. **Signature verification — the one item where a wrong guess would have been a real security gap, not just a broken feature — is fully confirmed.** One real bug the exercise surfaced and fixed: `api.get_version()` could have raised an uncaught `JSONDecodeError` and crashed entry setup if `/v1/version` were ever absent *and* `/version`'s fallback redirected to non-JSON content (this instance's own bare `/version` returns a 302, confirming the redirect behavior is real) — hardened in `api.py`, covered by two new tests. The only item never exercised is `published_after`/`published_before` (Section A tested status/starred/search but not a date range) — kept as a documented low-risk assumption (see the watch-list), not reopened as blocking.
 
 ---
 
@@ -18,7 +18,7 @@
 | R6 — ai_task chunking/prompts | **Best-effort docs only** (consumer-side, in `docs/setup.md` examples). Changeable anytime; not integration code. |
 | R2 / R4 — webhook delivery semantics / save_entry UX | Safe by design (events are best-effort accelerators). No action. |
 | Miniflux ↔ HA connectivity | **User's responsibility, out of scope** for the integration. |
-| Miniflux version | **Latest** → `/v1/feeds/counters` and `/v1/version` assumed present. |
+| Miniflux version | **2.3.2**, confirmed via the R1 checklist (webhook delivery `User-Agent` header) — `/v1/feeds/counters` and `/v1/version` both confirmed present. |
 
 ## Build-on-guesses protocol
 
@@ -79,7 +79,7 @@ Base URL may include a sub-path; all paths append under it. Auth header on **eve
 |---|---|---|
 | Signature header | `X-Miniflux-Signature` | **Confirmed** — exact match, both captured deliveries |
 | Event-type header | `X-Miniflux-Event-Type` | **Confirmed** — exact match, values `new_entries`/`save_entry` also match the body's own redundant top-level `event_type` field |
-| Signature scheme | **hex-encoded HMAC-SHA256 over the raw request body**, keyed by the Miniflux-generated secret | 🟡 **STRONGLY SUPPORTED, NOT YET CLOSED** — captured signatures are 64 hex characters (correct length/encoding for a SHA-256 digest), but the one verification attempt used the Miniflux API key instead of the real webhook secret, so no exact-match confirmation yet. Re-run checklist Section B4 with the actual secret (Miniflux → Settings → Integrations → Webhook page) to close this. |
+| Signature scheme | **hex-encoded HMAC-SHA256 over the raw request body**, keyed by the Miniflux-generated secret | **Confirmed** — re-ran checklist Section B4 with the actual webhook secret (the first attempt had used the API key by mistake); all three captured deliveries' computed digests matched their header value byte-for-byte |
 | Event types | `new_entries`, `save_entry` | **Confirmed** |
 | `new_entries` body | `{"event_type":"new_entries","feed":{feed obj},"entries":[entry objs...]}` | **Confirmed** — exact shape, including nested `feed.category:{id,title}` |
 | `save_entry` body | `{"event_type":"save_entry","entry":{entry obj}}` | **Confirmed** — exact shape, entry carries its own nested `feed` (see object-fields note above) |
@@ -89,15 +89,13 @@ Base URL may include a sub-path; all paths append under it. Auth header on **eve
 
 ---
 
-## Morning watch-list — status after the R1 run
+## Morning watch-list — final status (R1 closed)
 
-1. ~~Signature encoding hex vs base64~~ — strongly supported (right length/format), pending an exact-match re-test with the correct webhook secret (see webhook table above). Everything else on the original list is now confirmed:
+1. ~~Signature encoding hex vs base64~~ — **confirmed hex**, exact match on re-test with the real webhook secret.
 2. ~~Signature/event-type header names~~ — **confirmed exact.**
 3. ~~`/v1/version` path presence~~ — **confirmed present**; `api.get_version()` was additionally hardened against the real `/version` redirect-to-non-JSON behavior this run surfaced (see `api.py`, two new tests in `test_api.py`).
 4. ~~Entry `tags` + category nesting shape~~ — **confirmed**, plus the `new_entries`-per-entry-has-no-nested-feed nuance documented above.
 
-**Still genuinely open:**
-- **`published_after`/`published_before` param name + unit** — never exercised; still exactly the original guess.
-- **Webhook signature exact-match** — needs a B4 re-run with the real secret (see above). This is the only item standing between "R1 closed" and this file being fully retired.
+**Only item never exercised:** `published_after`/`published_before` param name + unit — Section A tested status/starred/search but not a published-date range. Kept as documented low-risk assumption (matches Miniflux's public API docs and every other confirmed param's naming convention); not a blocker, and a wrong guess here would surface loudly and immediately rather than silently, unlike the webhook signature this run just closed for real.
 
-Once the signature re-test lands, every `# ASSUMED (R1)` marker in `const.py` should either flip to a confirmed comment (as most already have) or move to the two rows above.
+Every `# ASSUMED (R1)` marker in `const.py` now reads either **R1 CONFIRMED** or, for the one item above, an explicit low-risk note rather than an open question. R1 is closed.

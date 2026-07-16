@@ -1,6 +1,8 @@
-# R1 — Contract-Pinning Checklist (run before freezing Phase 2)
+# R1 — Contract-Pinning Checklist — ✅ CLOSED (2026-07-16)
 
-**Why:** the design confines every exact Miniflux wire detail (auth header, field names, `total`/pagination, `/v1/version` presence, `/v1/feeds/counters` presence, webhook header names + payload shapes + signature scheme) to `api.py` + `normalize.py` + fixtures. This checklist captures those from **your** instance into `tests/fixtures/`, so the Phase-2 client is written against real bytes, not assumptions.
+**Status:** this checklist has been run in full (Sections A, B, C) against a real Miniflux 2.3.2 instance, and every wire-contract assumption it targeted is now confirmed — including, on a second B4 pass with the correct webhook secret, the signature scheme itself. See the "Answered" block at the bottom and `plans/decisions-and-assumed-contract.md` for the full reconciliation. Kept here as reference/history and in case a future instance (a version upgrade, a second Miniflux server) needs a re-check — not as an open task.
+
+**Why (historical):** the design confines every exact Miniflux wire detail (auth header, field names, `total`/pagination, `/v1/version` presence, `/v1/feeds/counters` presence, webhook header names + payload shapes + signature scheme) to `api.py` + `normalize.py` + fixtures. This checklist captured those from **your** instance into `tests/fixtures/`, so the Phase-2 client was written against real bytes, not assumptions.
 
 **Where to run:** any box that can reach Miniflux **and** has this repo checked out (commands write into `tests/fixtures/`). Run from the repo root — a machine on your LAN, since this instance (like the coding agent building this integration) is only reachable from inside your network, not from the internet. Everything below is copy-paste; you only edit one `export` line in Step 0.
 
@@ -241,12 +243,13 @@ Auth: token (X-Auth-Token) or basic? token — confirmed via smoke test
 Entries response has top-level `total`?  yes (700)
 Signature header name:            X-Miniflux-Signature — confirmed exact
 Event-type header name:           X-Miniflux-Event-Type — confirmed exact
-Signature scheme confirmed HMAC-SHA256 hex over raw body?  NOT YET — B4 was run with the API key
-                                   instead of the real webhook secret (easy mix-up, see the warning
-                                   added to B4 above). Captured signatures are valid 64-hex-char
-                                   SHA-256-length digests, so the scheme itself is very likely right —
-                                   re-run B4 with the actual secret from Miniflux's webhook settings
-                                   page to close this for good.
+Signature scheme confirmed HMAC-SHA256 hex over raw body?  YES — first B4 pass used the API key by
+                                   mistake instead of the real webhook secret (easy mix-up, both look
+                                   like similar hex strings), which produced a mismatch that looked
+                                   like a scheme problem but wasn't. Re-ran B4 with the actual secret
+                                   from Miniflux's webhook settings page: all three captured
+                                   deliveries' computed digests matched their header value
+                                   byte-for-byte. Confirmed for real.
 Any field-name surprises in feeds/entries vs the lists above? One real, harmless one: webhook
                                    new_entries' per-entry objects (inside "entries") have no nested
                                    "feed" key — only the envelope's top-level "feed" does. Doesn't
@@ -254,6 +257,6 @@ Any field-name surprises in feeds/entries vs the lists above? One real, harmless
 Any mutation returning non-2xx?   No — all five Section C mutations returned 204.
 ```
 
-**Only one thing left to fully close R1:** re-run B4 with the real webhook secret (Miniflux → Settings → Integrations → Webhook page — it's the value labeled **Webhook secret**, generated when the URL was saved in B2, not the API key). Paste back whether the computed and header signatures match, and the signature-scheme assumption in `const.py`/`signature.py` gets its final confirmation.
+**R1 is closed.** The only item never exercised was `published_after`/`published_before` (Section A tested status/starred/search but not a date-range filter) — kept as a documented low-risk assumption in `const.py`/`plans/decisions-and-assumed-contract.md` rather than reopened as blocking, since a wrong guess there would surface loudly and immediately, unlike the webhook signature this run just confirmed for real.
 
-With those, the implementer freezes `const.py` header/param constants, `normalize.py` field maps, and the Phase-1/Phase-2 fixtures — and the "written against assumptions" risk (R1) is closed.
+With this, `const.py` header/param constants, `normalize.py` field maps, and `signature.py`'s verification scheme are all frozen against real data — the "written against assumptions" risk (R1) is closed.
