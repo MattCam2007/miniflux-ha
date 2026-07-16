@@ -199,7 +199,8 @@ Build chunks in order; 1.2 and 1.3 depend on 1.1; 1.6 depends on 1.1+1.5; 1.8 de
 
 ## Phase 1 exit criteria
 
-- All 9 modules at 100% line+branch; suite runs with **no HA installed** (a CI job or local check imports each Phase-1 module in a bare venv to prove framework-freedom).
+- All 9 modules at 100% line+branch.
+- **Framework-freedom is a source-level check, not a dynamic import check (resolved during Phase 3 implementation, was a dynamic subprocess check in earlier drafts of this plan):** once `__init__.py` legitimately imports `homeassistant` for entry setup (Phase 3, unavoidable — it's the integration's actual entry point), Python's import model means importing *any* submodule of `custom_components.miniflux` transitively runs `__init__.py` first, so "importable with HA absent" stops being a meaningful or achievable property of the package's submodules — that's true of every HA custom integration, not a coupling problem specific to these modules. The thing that's actually architecturally meaningful — that each pure-core module's *own source* never references an HA API — is what `tests/test_seams.py::test_pure_core_modules_have_no_homeassistant_import` checks (a source-text guard, verified to catch a real violation by injecting one and confirming failure), consistent with the existing aiohttp-import seam guard in the same file. There is no separate CI step or standalone script for this; it runs as part of the normal `pytest tests/` collection.
 - Conftest builders (`snapshot_factory`, `fake_api`, `signed_webhook_request`) exist and agree with the real modules (1.5 pins the signer).
 - Fixtures cover every edge case referenced above; each tagged with its Miniflux source version (R1).
 - Deviations footer records the one open micro-decision (re-emit feed_error on message change — default no).

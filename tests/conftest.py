@@ -1,9 +1,4 @@
-"""Shared test harness for the Miniflux integration test suite.
-
-``fake_api`` is deferred to Phase 2, once ``api.py``'s real method
-signatures exist to mirror exactly — stubbing it earlier risks drifting
-from the real contract.
-"""
+"""Shared test harness for the Miniflux integration test suite."""
 
 from __future__ import annotations
 
@@ -11,10 +6,21 @@ import hashlib
 import hmac
 import json
 from datetime import UTC, datetime
+from unittest.mock import create_autospec
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.miniflux.const import WEBHOOK_HEADER_EVENT_TYPE, WEBHOOK_HEADER_SIGNATURE
+from custom_components.miniflux.api import MinifluxClient
+from custom_components.miniflux.const import (
+    CONF_API_KEY,
+    CONF_URL,
+    CONF_VERIFY_SSL,
+    CONF_WEBHOOK_ID,
+    DOMAIN,
+    WEBHOOK_HEADER_EVENT_TYPE,
+    WEBHOOK_HEADER_SIGNATURE,
+)
 from custom_components.miniflux.models import CategoryUnread, Entry, Feed, Snapshot
 
 pytest_plugins = "pytest_homeassistant_custom_component"
@@ -132,15 +138,31 @@ def signed_webhook_request():
 
 @pytest.fixture
 def mock_config_entry_data():
-    """Plain-dict config-entry data for the Miniflux integration.
-
-    Deliberately a plain dict (not a MockConfigEntry) here in Phase 0 so this
-    fixture has no dependency on the config flow (Phase 3). Phase 3 adds a
-    ``mock_config_entry`` fixture that wraps this into a real MockConfigEntry.
-    """
+    """Plain-dict config-entry data for the Miniflux integration."""
     return {
-        "url": "https://reader.example.lan",
-        "api_key": "test-api-key",
-        "verify_ssl": True,
-        "webhook_id": "test-webhook-id",
+        CONF_URL: "https://reader.example.lan",
+        CONF_API_KEY: "test-api-key",
+        CONF_VERIFY_SSL: True,
+        CONF_WEBHOOK_ID: "test-webhook-id",
     }
+
+
+@pytest.fixture
+def mock_config_entry(hass, mock_config_entry_data):
+    """A MockConfigEntry already added to hass, for Phase 3+ tests that need
+    a real config entry (coordinator, __init__ setup, services, webhook)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="reader.example.lan:1",
+        data=mock_config_entry_data,
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+@pytest.fixture
+def fake_client():
+    """An autospec'd MinifluxClient stand-in: same public method signatures
+    as the real client (so it can't silently drift from api.py), each an
+    AsyncMock configurable per-test via `.return_value`/`.side_effect`."""
+    return create_autospec(MinifluxClient, instance=True)
