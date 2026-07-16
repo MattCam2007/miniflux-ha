@@ -16,9 +16,9 @@ Order: 6.1 register/unregister → 6.2 handler happy path → 6.3 rejection path
 **Purpose:** stand up the per-entry webhook endpoint using the `webhook_id` minted at config time (3.1), honoring `local_only` (architecture §3.4, setup.md Part 2).
 
 **Public surface:**
-- `async_register_webhook(hass, entry)` — `webhook.async_register(hass, DOMAIN, "Miniflux", webhook_id, handler, local_only=options.local_only)`; called from `__init__` setup (3.4) **only when a secret is configured** (else 6.4 raises a repair instead).
+- `async_register_webhook(hass, entry)` — `webhook.async_register(hass, DOMAIN, "Miniflux", webhook_id, handler, local_only=options.local_only)`; called from `__init__` setup (3.4).
 - `async_unregister_webhook(hass, entry)` — `webhook.async_unregister`; called from unload (3.4).
-- handler is a closure/partial bound to the entry so it can reach the entry's secret + coordinator.
+- handler is a closure bound to the entry so it can reach the entry's secret + coordinator.
 
 **Tests first (red):**
 - setup with a secret present → webhook registered at `webhook_id` (assert `async_generate_url` resolves and the handler is reachable).
@@ -27,6 +27,12 @@ Order: 6.1 register/unregister → 6.2 handler happy path → 6.3 rejection path
 - setup with **no** secret → not registered; a repair issue raised (6.4).
 
 **DoD:** register/unregister symmetric with entry lifecycle; no-secret path defers to repair, not a crash.
+
+**Resolved during implementation — registration is unconditional, not gated on a secret:** the bullet above ("only when a secret is configured") turned out to contradict both chunk 6.3's own rejection-path spec and setup.md Part 2, which both describe a delivery arriving before the secret is wired as getting an explicit **401 + repair issue** — that requires a live handler to inspect the request, not an absent registration. It also contradicts D9's sequencing: the webhook URL must exist and be stable *before* the user can paste it into Miniflux, and Miniflux may already be pointed at it during the gap between "URL saved in Miniflux" (secret not yet copied back into HA) and "secret pasted into HA options." Conditionally registering would mean deliveries in that gap either 404 or (per HA's real behavior, see below) silently 200 with nothing processed and no repair ever raised, since the handler that would raise it never runs. The corrected design: `async_register_webhook` always registers the endpoint, and the handler itself checks for a configured secret as its first verification step -- no secret ⇒ 401 + `webhook_secret_missing` (structurally the same "can never verify" outcome as a wrong secret, just a distinct repair so the user knows which fix applies).
+
+**Resolved during implementation — "404s / not handled" corrected to "200, not processed":** HA's real `webhook.async_handle_webhook` deliberately returns `200 OK` for *any* unregistered webhook_id ("Always respond successfully to not give away if a hook exists or not" -- a real HA anti-enumeration design choice, not an oversight). Post-unload tests assert 200 with zero bus events, not a 404.
+
+**Resolved during implementation — the D1 "no unhandled 500" guarantee is ours to keep, not HA's:** HA's webhook dispatcher already catches *any* exception a handler raises and converts it to a bare `200 OK` (so a bug there never surfaces as a 500 either) -- but a silent 200 on an internal bug is arguably worse than a loud failure (D10): Miniflux would treat it as a successful, fully-processed delivery. `_handle_delivery` therefore wraps the whole pipeline in its own outer `try/except Exception` that maps anything unexpected to an explicit `400`, rather than relying on HA's swallow-to-200 fallback.
 
 ---
 
@@ -83,6 +89,10 @@ Order: 6.1 register/unregister → 6.2 handler happy path → 6.3 rejection path
 - issues carry a translation key (strings finalized Phase 8) and a reference to the options step.
 
 **DoD:** the two failure states from setup.md's troubleshooting table become visible repair issues that self-clear on fix (D10 "every failure has a visible home").
+
+**Resolved during implementation — issue ids are namespaced per config entry:** `repairs.py`'s issue ids are `f"{base}_{entry.entry_id}"`, not the bare `webhook_secret_missing`/`webhook_signature_failing` strings the spec implies. A multi-instance setup (two Miniflux servers) must not let fixing instance A's secret silently clear instance B's still-broken issue -- a bare global id would do exactly that. `translation_placeholders` carries `instance_url` (not the raw `entry_id`) so the issue text can tell the user *which* instance needs attention, consistent with how outbound events already discriminate instances (§3.5).
+
+**Resolved during implementation — `webhook.py` is a second, deliberate exception to the "only api.py imports aiohttp" seam rule** (`tests/test_seams.py`): HA's webhook handler contract is typed directly in terms of `aiohttp.web.Request`/`Response`, and every core HA component that registers a webhook handler imports `aiohttp.web` the same way -- there is no HA-provided wrapper to hide it behind. This is architecturally different from api.py's aiohttp usage (an outbound-transport *choice*, D6): `webhook.py` doesn't choose to speak HTTP, it fulfills a framework contract for receiving it. `strings.json`/translations for the two issues' text are deferred to Phase 8 per that phase's own scope (`translation_key` is wired now; the catalog entry isn't written yet), matching how `config_flow.py`'s form fields have shipped without `strings.json` since Phase 3.
 
 ---
 

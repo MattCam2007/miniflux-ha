@@ -59,6 +59,7 @@ SEARCH_LIMIT_MAX = 500
 HYDRATE_IDS_MAX = 100
 UPDATE_IDS_MAX = 500
 WEBHOOK_MAX_BODY_BYTES = 10_485_760  # 10 MiB
+WEBHOOK_SIGNATURE_FAILURE_THRESHOLD = 5  # consecutive bad signatures before a repair issue
 REFRESH_DEBOUNCE_SECONDS = 10
 TITLE_TRUNCATE = 256
 API_CONCURRENCY = 4
@@ -101,3 +102,8 @@ ENTRY_STATUS_UNREAD = "unread"
 ENTRY_STATUS_READ = "read"
 ENTRY_STATUS_REMOVED = "removed"
 ENTRY_STATUSES = (ENTRY_STATUS_UNREAD, ENTRY_STATUS_READ, ENTRY_STATUS_REMOVED)
+
+# --- Repair issue ids (architecture C7) -- wiring problems only, never
+# content-level ones (broken feeds are the error sensor + events, not a repair).
+ISSUE_WEBHOOK_SECRET_MISSING = "webhook_secret_missing"
+ISSUE_WEBHOOK_SIGNATURE_FAILING = "webhook_signature_failing"

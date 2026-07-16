@@ -2,8 +2,7 @@
 component map, D10).
 
 Client + coordinator lifecycle (Phase 3), platform forwarding (Phase 4),
-and service registration (Phase 5). Webhook registration is added here
-incrementally by Phase 6 as that module lands.
+service registration (Phase 5), and webhook registration (Phase 6).
 
 Services are registered once and never unregistered on unload, even when
 the last config entry goes away: services are process-global (registered
@@ -13,6 +12,11 @@ services._resolve_entry's "No Miniflux instance is configured" validation
 error. Tracking entry count just to unregister on last-unload would add
 bookkeeping for a purely cosmetic benefit (services technically absent from
 the UI vs. present but erroring clearly).
+
+Webhook registration is the opposite: it's per-entry (each config entry
+mints its own webhook_id at creation), so it is registered/unregistered
+symmetrically with each entry's own setup/unload, unlike the domain-global
+services.
 """
 
 from __future__ import annotations
@@ -36,6 +40,7 @@ from .const import (
 )
 from .coordinator import MinifluxCoordinator
 from .services import async_register_services
+from .webhook import async_register_webhook, async_unregister_webhook
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,6 +76,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MinifluxConfigEntry) -> 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     async_register_services(hass)
+    async_register_webhook(hass, entry)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -78,6 +84,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MinifluxConfigEntry) -> 
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: MinifluxConfigEntry) -> bool:
+    async_unregister_webhook(hass, entry)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 

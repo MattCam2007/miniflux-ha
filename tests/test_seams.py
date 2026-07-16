@@ -42,17 +42,23 @@ PURE_CORE_MODULES = (
 
 
 def test_only_api_module_imports_aiohttp():
-    """All HTTP lives in api.py (seam corollary, plans/00-overview.md §4) --
-    if another module starts importing aiohttp, it has taken on an HTTP
-    responsibility that belongs in the client instead."""
+    """All *outbound* HTTP lives in api.py (seam corollary,
+    plans/00-overview.md §4) -- if another module starts importing aiohttp,
+    it has taken on an HTTP client responsibility that belongs there instead.
+
+    webhook.py is a deliberate second exception (Phase 6): it doesn't choose
+    to speak HTTP, it *receives* it -- HA's own webhook component contract
+    is typed directly in terms of aiohttp.web.Request/Response (every core
+    HA component that registers a webhook handler imports aiohttp.web the
+    same way), so there is no HA-provided seam to hide that behind."""
     offenders = []
     for path in PACKAGE_DIR.glob("*.py"):
-        if path.name in ("api.py", "__init__.py"):
+        if path.name in ("api.py", "__init__.py", "webhook.py"):
             continue
         if _IMPORT_AIOHTTP_RE.search(path.read_text()):
             offenders.append(path.name)
 
-    assert offenders == [], f"unexpected aiohttp import(s) outside api.py: {offenders}"
+    assert offenders == [], f"unexpected aiohttp import(s) outside api.py/webhook.py: {offenders}"
 
 
 def test_api_module_does_import_aiohttp():
