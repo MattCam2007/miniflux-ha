@@ -16,3 +16,5 @@ TDD build plan for the Miniflux Home Assistant integration, derived from [`../do
 | 8 | [`08-diagnostics-i18n-release.md`](./08-diagnostics-i18n-release.md) | Diagnostics (redacted), translations, README, HACS release |
 
 Each chunk (e.g. `P1.4`) is an individually testable red→green→refactor unit with its tests listed first. Build sequentially; deviate only on a real blocker (overview §7).
+
+**Build-time reference:** [`r1-contract-pinning.md`](./r1-contract-pinning.md) — copy-paste commands to capture your live Miniflux instance's exact wire shapes (headers, payloads, signature scheme) into `tests/fixtures/`. Run it before freezing Phase 2; it closes risk R1.
