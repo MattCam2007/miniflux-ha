@@ -122,6 +122,12 @@ The server saves each delivery's **exact headers** (reveals the signature + even
 2. Webhook URL: `http://<this-box-ip>:8099/`  (an IP/host Miniflux can reach — same LAN is fine).
 3. **Save.** Miniflux shows a generated **Webhook secret** — copy it, you'll need it in B4 (and later for real HA setup).
 
+> **If Miniflux and this box are both on a private LAN** (the normal case), check its logs before assuming B3 is broken:
+> ```bash
+> docker compose logs --tail=80 miniflux | grep -iE 'webhook|integration'
+> ```
+> If you see `connection to private network is blocked: ... resolves to a non-public IP address`, that's Miniflux's own SSRF protection (≥ 2.2.18) refusing to send anywhere on a private network — including your own capture box. Add `INTEGRATION_ALLOW_PRIVATE_NETWORKS=1` to **Miniflux's** environment and recreate it (`docker compose up -d` — a plain restart won't pick up the new var), then retry B3. This isn't specific to the capture step: it's the same setting `docs/setup.md` documents as a real-HA prerequisite, so finding it here saves hitting it again later.
+
 ### B3 — trigger both events
 
 - **`new_entries`:** the reliable trick — **add a brand-new feed** (Feeds → Add feed → any active blog's RSS URL). Its first fetch makes every entry "new," which fires `new_entries` within a minute. (Keep this feed for Section C, or delete it after.)
