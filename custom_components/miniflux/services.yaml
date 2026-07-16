@@ -1,0 +1,343 @@
+# Service field definitions for the HA UI (chunk 5.4). Field keys here must
+# exactly match custom_components/miniflux/services.py's FIELD_* constants.
+
+search_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      description: Category id or exact title.
+      required: false
+      selector:
+        text:
+    feed:
+      description: Feed id or exact title.
+      required: false
+      selector:
+        text:
+    status:
+      description: One or more of unread/read/removed. Omit or pass an empty list to match any status.
+      required: false
+      selector:
+        select:
+          options: ["unread", "read", "removed"]
+          multiple: true
+    starred:
+      required: false
+      selector:
+        boolean:
+    search:
+      description: Free-text search.
+      required: false
+      selector:
+        text:
+    published_within:
+      description: Duration window ending now. Cannot be combined with published_after/published_before.
+      required: false
+      selector:
+        duration:
+    published_after:
+      required: false
+      selector:
+        datetime:
+    published_before:
+      required: false
+      selector:
+        datetime:
+    order:
+      required: false
+      selector:
+        text:
+    direction:
+      required: false
+      selector:
+        select:
+          options: ["asc", "desc"]
+    limit:
+      description: Maximum entries to return (auto-paginated internally up to this count).
+      required: false
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 500
+    include_content:
+      description: Include full article HTML in the response. Off by default to keep responses small.
+      required: false
+      default: false
+      selector:
+        boolean:
+
+count_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    feed:
+      required: false
+      selector:
+        text:
+    status:
+      required: false
+      selector:
+        select:
+          options: ["unread", "read", "removed"]
+          multiple: true
+    starred:
+      required: false
+      selector:
+        boolean:
+    search:
+      required: false
+      selector:
+        text:
+    published_within:
+      required: false
+      selector:
+        duration:
+    published_after:
+      required: false
+      selector:
+        datetime:
+    published_before:
+      required: false
+      selector:
+        datetime:
+
+get_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    entry_ids:
+      description: Entry ids to hydrate (e.g. from a miniflux_new_entries event). Ids that no longer exist are returned in `missing`, not treated as an error.
+      required: true
+      selector:
+        object:
+    include_content:
+      description: Include full article HTML. On by default, since hydrating entries usually means you want the body.
+      required: false
+      default: true
+      selector:
+        boolean:
+
+get_feeds:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    only_with_errors:
+      description: Only return feeds with a non-zero parsing error count.
+      required: false
+      default: false
+      selector:
+        boolean:
+
+update_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    entry_ids:
+      description: Exactly these entries are affected -- never a scope. At least one of status/starred is required.
+      required: true
+      selector:
+        object:
+    status:
+      required: false
+      selector:
+        select:
+          options: ["unread", "read", "removed"]
+    starred:
+      description: Declarative -- entries already in the target state are left untouched (idempotent, safe to retry).
+      required: false
+      selector:
+        boolean:
+
+mark_all_read:
+  description: Marks an entire scope as read. Prefer update_entries with an explicit id list for pipeline automations -- entries that arrive between a query and this call would be silently marked read without ever being processed. This service is for the human "declare inbox bankruptcy" case.
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      description: Exactly one of feed/category/everything is required.
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    everything:
+      description: Mark every entry across the whole instance as read.
+      required: false
+      selector:
+        boolean:
+
+create_feed:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed_url:
+      required: true
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    crawler:
+      description: Use the headless-browser crawler for this feed instead of a plain HTTP fetch.
+      required: false
+      selector:
+        boolean:
+
+update_feed:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      required: true
+      selector:
+        text:
+    title:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    feed_url:
+      required: false
+      selector:
+        text:
+    disabled:
+      required: false
+      selector:
+        boolean:
+    crawler:
+      required: false
+      selector:
+        boolean:
+
+delete_feed:
+  description: Permanently deletes a feed and its entries from Miniflux. Not reversible.
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      required: true
+      selector:
+        text:
+
+refresh_feed:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      required: true
+      selector:
+        text:
+
+refresh_all_feeds:
+  description: Refreshes every feed on the instance. Separate from refresh_feed on purpose -- the two can never be confused by a missing argument.
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+
+discover_feeds:
+  description: Probes a site URL for candidate RSS/Atom feeds, without subscribing to any of them.
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    url:
+      required: true
+      selector:
+        text:
+
+create_category:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    title:
+      required: true
+      selector:
+        text:
+
+update_category:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: true
+      selector:
+        text:
+    title:
+      required: true
+      selector:
+        text:
+
+delete_category:
+  description: Deletes a category. Feeds in it become uncategorized in Miniflux; they are not deleted.
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: true
+      selector:
+        text:
+
+export_opml:
+  description: Returns the instance's full feed list as an OPML string. Useful for a scheduled backup automation.
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+
+import_opml:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    opml:
+      required: true
+      selector:
+        text:
+          multiline: true

@@ -27,6 +27,7 @@ from .const import (
     API_PATH_FEEDS,
     API_PATH_IMPORT,
     API_PATH_ME,
+    API_PATH_USERS,
     API_TIMEOUT_SECONDS,
     API_VERSION_PATH_ROOT,
     API_VERSION_PATH_V1,
@@ -348,3 +349,23 @@ class MinifluxClient:
 
     async def import_opml(self, opml: str) -> None:
         await self._request("POST", API_PATH_IMPORT, data=opml, parse_json=False)
+
+    # --- Scope-level mark-all-read (architecture §4 Rule 2: a different
+    # blast-radius class from set_entries_status, kept as separate methods
+    # so "these N ids" and "everything matching a scope" can never be one
+    # typo apart). ---
+
+    async def mark_feed_read(self, feed_id: int) -> None:
+        await self._request("PUT", f"{API_PATH_FEEDS}/{feed_id}/mark-all-as-read")
+
+    async def mark_category_read(self, category_id: int) -> None:
+        await self._request("PUT", f"{API_PATH_CATEGORIES}/{category_id}/mark-all-as-read")
+
+    async def mark_all_read(self) -> None:
+        """User-scope mark-all. Fetches the current user id fresh each call
+        rather than requiring a caller to track it -- this is a rare,
+        deliberate, human-triggered action, not a hot path, so the extra
+        round-trip is a fair price for not having to thread a user id
+        through every caller."""
+        me = await self.get_me()
+        await self._request("PUT", f"{API_PATH_USERS}/{me['id']}/mark-all-as-read")

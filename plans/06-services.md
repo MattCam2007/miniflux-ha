@@ -10,7 +10,7 @@
 **Cross-cutting conventions (implement once, in a shared helper, test once):**
 - **Targeting:** optional `config_entry_id`; single configured entry → auto-resolved; multiple → required; missing/ambiguous → `ServiceValidationError` (architecture §3.3 targeting rule).
 - **Error surfacing:** caller mistakes → `ServiceValidationError` (raised pre-HTTP); Miniflux/transport failures → `HomeAssistantError` with `errors.user_message(...)`. Both fail the calling script step visibly (D10).
-- **Response support:** query services use `SupportsResponse.ONLY`; mutations `SupportsResponse.OPTIONAL`; `services.yaml` documents fields for the UI.
+- **Response support:** query/inventory services (`search_entries`, `count_entries`, `get_entries`, `get_feeds`, `create_feed`, `discover_feeds`, `create_category`, `export_opml`) use `SupportsResponse.ONLY` since they always return data the caller needs. Void mutations (`mark_all_read`, `update_feed`, `delete_feed`, `refresh_feed`, `refresh_all_feeds`, `update_category`, `delete_category`, `import_opml`) register with no `supports_response` kwarg at all (defaults to `NONE`) — resolved during implementation, see below. `update_entries` is the one exception at `SupportsResponse.OPTIONAL`, since `{updated}` is a nice-to-have count rather than something every caller needs. `services.yaml` documents fields for the UI.
 - **Ref sugar:** `category`/`feed` accept id or exact title; titles resolved via the coordinator snapshot (`filters.resolve_refs`) with no extra API call; unknown/ambiguous → validation error.
 
 Order: 5.0 shared plumbing → 5.1 query → 5.2 mutation → 5.3 admin. Each service is its own red-green chunk; grouped here by family.
@@ -38,7 +38,7 @@ Order: 5.0 shared plumbing → 5.1 query → 5.2 mutation → 5.3 admin. Each se
 Rule 1 (architecture §4): shared filter schema, output differs → separate names, stable shapes, one validation module (`filters`).
 
 **Services & envelopes (architecture §3.3):**
-- `miniflux.search_entries` → build `EntryFilter` from call data; `validate()`; `resolve_refs(snapshot)`; `to_query_params`; `api.query_entries(..., limit)`; return `{total, count, entries:[Entry-as-dict]}`. `include_content` default **False**; `fetch_original` default False. `SupportsResponse.ONLY`.
+- `miniflux.search_entries` → build `EntryFilter` from call data; `validate()`; `resolve_refs(snapshot)`; `to_query_params`; `api.query_entries(..., limit)`; return `{total, count, entries:[Entry-as-dict]}`. `include_content` default **False**. `SupportsResponse.ONLY`. (No `fetch_original` field — see Phase 5 resolution note: the client method remains unimplemented, so there is nothing for a service to call.)
 - `miniflux.count_entries` → same filter build, `api.count_entries` → `{total}`. Cheap pre-flight (D-Rule1).
 - `miniflux.get_entries` → `entry_ids` (1–`HYDRATE_IDS_MAX`); `api.get_entries_by_id(include_content default True)` → `{entries, missing}` (partial success, §3.3).
 - `miniflux.get_feeds` → `category?`, `only_with_errors?`; **live** `api.get_feeds()` (not cache — remediation/inventory surface, replaces per-feed entities) filtered → `{feeds}`.
@@ -92,6 +92,8 @@ Rule 3 (architecture §4): per-verb services for honest static schemas; destruct
 - `miniflux.create_category` / `update_category` / `delete_category`.
 - `miniflux.export_opml` → `{opml}` (enables the nightly-backup automation, setup.md Part 3); `miniflux.import_opml` (`opml`).
 
+**Resolved during implementation:** the optional tier was fully built and tested in this pass, not deferred — same low-cost-passthrough finding as Phase 2's discover/OPML client methods (see `plans/03-api-client.md`). `mark_all_read`'s scoped client methods (`mark_feed_read`/`mark_category_read`/`mark_all_read`) did not exist yet at the start of this phase despite being implied by the architecture doc — backfilled into `api.py` with its own red-green cycle (new `API_PATH_USERS` const, `TestMarkAllRead` in `test_api.py`) rather than treated as a Phase 5 shortcut.
+
 **Tests first (red):**
 - `create_feed` without `feed_url` → validation error; with it → client `create_feed` called, `{feed_id}` returned.
 - `delete_feed` dispatches DELETE; is a distinct service (not an `action` enum) — assert its schema requires only `feed`.
@@ -107,7 +109,7 @@ Rule 3 (architecture §4): per-verb services for honest static schemas; destruct
 
 **Purpose:** the HA UI needs field definitions (`services.yaml`) and localized names/descriptions (`strings.json`/`translations`, finalized Phase 8) to render service forms; hassfest validates these.
 
-**Produces:** `services.yaml` with every service's fields, selectors (entity/text/number/boolean/object), defaults, and — critically — the `mark_all_read` race warning and the `fetch_original` "slow, hits origin sites" note in descriptions (architecture §3.3).
+**Produces:** `services.yaml` with every service's fields, selectors (entity/text/number/boolean/object), defaults, and — critically — the `mark_all_read` race warning steering pipelines to `update_entries` (architecture §3.3).
 
 **Tests first (red):**
 - hassfest passes with the services defined (gate).
@@ -123,3 +125,7 @@ Rule 3 (architecture §4): per-verb services for honest static schemas; destruct
 - The §4 cut is realized: shared-schema queries share `filters`; declarative `update_entries` vs scope `mark_all_read`; per-verb admin with isolated `delete_feed`.
 - Mutations request a debounced coordinator refresh (sensor consistency).
 - **R3 recorded in release notes:** no tag-write service exists because stock Miniflux has no such API; engagement = starred (settable via `update_entries`) + `save_entry` event. Any "tag it" consumer requirement is out of scope until R3 is resolved.
+- **Tracked gap carried forward again:** `fetch_original` (readability re-fetch) still has no `api.py` method and no service exposes it (see `plans/03-api-client.md` chunk 2.5). No Phase 5 service needed it, so it stays deferred rather than built speculatively — pick it up if a real consumer asks for original-content re-fetch.
+- `services.py` reached 100% branch coverage (above its 90% HA-coupled floor); every coverage gap surfaced by `--cov-report=term-missing` was investigated as a real untested behavior (category filter on `get_feeds`, unknown-category error path, and each `update_feed` optional-field mapping) and given an explicit test, not padded or dismissed at the floor.
+
+**Testing gotcha worth carrying into Phase 6+:** HA's `ServiceRegistry.async_call` checks the caller's `return_response` argument against the service's registered `supports_response` *before* running schema validation — so a test exercising a validation error on a `SupportsResponse.NONE`/`ONLY` service must still pass the matching `return_response` value, or it fails with `service_does_not_support_response`/`service_lacks_response_request` instead of the `ServiceValidationError`/`vol.Invalid` the test actually means to assert. `tests/test_services.py`'s `_call` helper takes `return_response` as a kwarg (default `True`) for exactly this reason.

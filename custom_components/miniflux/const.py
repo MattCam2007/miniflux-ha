@@ -81,6 +81,7 @@ API_PATH_ENTRIES = "/v1/entries"
 API_PATH_DISCOVER = "/v1/discover"
 API_PATH_EXPORT = "/v1/export"
 API_PATH_IMPORT = "/v1/import"
+API_PATH_USERS = "/v1/users"
 
 # ASSUMED (R1): published-date filter param names + unit (unix epoch seconds).
 PARAM_PUBLISHED_AFTER = "published_after"

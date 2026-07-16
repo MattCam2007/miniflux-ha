@@ -84,6 +84,16 @@ class TestSetup:
         assert entry.state is ConfigEntryState.LOADED
         assert entry.runtime_data.coordinator is not None
 
+    async def test_setup_registers_services(self, hass):
+        from custom_components.miniflux.const import DOMAIN, SERVICE_SEARCH_ENTRIES
+
+        entry = _make_entry(hass)
+        with _patched_client(feeds=[]):
+            await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+
+        assert hass.services.has_service(DOMAIN, SERVICE_SEARCH_ENTRIES)
+
     async def test_setup_forwards_sensor_and_binary_sensor_platforms(self, hass):
         entry = _make_entry(hass)
         with _patched_client(feeds=[]):

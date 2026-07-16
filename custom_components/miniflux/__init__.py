@@ -1,10 +1,18 @@
 """The Miniflux integration: entry setup/unload/reload (architecture §1
 component map, D10).
 
-Client + coordinator lifecycle (Phase 3) and platform forwarding (Phase 4).
-Service registration and webhook registration are added here incrementally
-by Phases 5/6 as those modules land -- each phase's own tests cover its
-addition; this module's own tests only cover what's built so far.
+Client + coordinator lifecycle (Phase 3), platform forwarding (Phase 4),
+and service registration (Phase 5). Webhook registration is added here
+incrementally by Phase 6 as that module lands.
+
+Services are registered once and never unregistered on unload, even when
+the last config entry goes away: services are process-global (registered
+against the domain, not a specific entry), re-registration is idempotent,
+and a service call with zero entries configured already fails cleanly via
+services._resolve_entry's "No Miniflux instance is configured" validation
+error. Tracking entry count just to unregister on last-unload would add
+bookkeeping for a purely cosmetic benefit (services technically absent from
+the UI vs. present but erroring clearly).
 """
 
 from __future__ import annotations
@@ -27,6 +35,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
 )
 from .coordinator import MinifluxCoordinator
+from .services import async_register_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +69,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: MinifluxConfigEntry) -> 
 
     entry.runtime_data = MinifluxRuntimeData(client=client, coordinator=coordinator)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+
+    async_register_services(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

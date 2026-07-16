@@ -747,3 +747,41 @@ class TestOpml:
 
         assert session.calls[0].method == "POST"
         assert session.calls[0].kwargs["data"] == "<opml><body/></opml>"
+
+
+class TestMarkAllRead:
+    """Backfilled during Phase 5 (services chunk 5.2) -- the scoped
+    mark-all-as-read endpoints were documented in the assumed contract but
+    missed when api.py was first built in Phase 2."""
+
+    async def test_mark_feed_read_hits_feed_scoped_endpoint(self):
+        session = FakeSession([FakeResponse(204, text_body="")])
+        client = _client(session)
+
+        await client.mark_feed_read(10)
+
+        assert session.calls[0].method == "PUT"
+        assert session.calls[0].url == f"{BASE_URL}/v1/feeds/10/mark-all-as-read"
+
+    async def test_mark_category_read_hits_category_scoped_endpoint(self):
+        session = FakeSession([FakeResponse(204, text_body="")])
+        client = _client(session)
+
+        await client.mark_category_read(100)
+
+        assert session.calls[0].method == "PUT"
+        assert session.calls[0].url == f"{BASE_URL}/v1/categories/100/mark-all-as-read"
+
+    async def test_mark_all_read_fetches_user_id_then_marks_user_scope(self):
+        by_url = {
+            f"{BASE_URL}/v1/me": FakeResponse(200, json_body={"id": 7, "username": "matt"}),
+            f"{BASE_URL}/v1/users/7/mark-all-as-read": FakeResponse(204, text_body=""),
+        }
+        session = FakeSession(by_url=by_url)
+        client = _client(session)
+
+        await client.mark_all_read()
+
+        marked_calls = [c for c in session.calls if c.url.endswith("mark-all-as-read")]
+        assert len(marked_calls) == 1
+        assert marked_calls[0].url == f"{BASE_URL}/v1/users/7/mark-all-as-read"

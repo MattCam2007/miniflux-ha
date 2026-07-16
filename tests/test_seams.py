@@ -8,6 +8,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
+from custom_components.miniflux.const import DOMAIN
+from custom_components.miniflux.services import async_register_services
+
 PACKAGE_DIR = Path(__file__).parent.parent / "custom_components" / "miniflux"
 _IMPORT_AIOHTTP_RE = re.compile(r"^\s*(import aiohttp\b|from aiohttp\b)", re.MULTILINE)
 _IMPORT_HA_RE = re.compile(r"^\s*(import homeassistant\b|from homeassistant\b)", re.MULTILINE)
@@ -72,3 +77,16 @@ def test_init_module_does_import_homeassistant():
     """Sanity check that the guard above isn't vacuously true -- __init__.py
     legitimately needs homeassistant for entry setup (Phase 3)."""
     assert _IMPORT_HA_RE.search((PACKAGE_DIR / "__init__.py").read_text())
+
+
+async def test_services_yaml_matches_registered_services_exactly(hass):
+    """Chunk 5.4: no undocumented service (missing UI form) and no orphan
+    services.yaml entry (documents a service that doesn't exist)."""
+    async_register_services(hass)
+    registered = set(hass.services.async_services().get(DOMAIN, {}).keys())
+
+    documented = set(yaml.safe_load((PACKAGE_DIR / "services.yaml").read_text()).keys())
+
+    assert documented == registered, (
+        f"undocumented: {registered - documented}; orphaned: {documented - registered}"
+    )

@@ -180,3 +180,29 @@ def coordinator(hass, mock_config_entry, fake_client):
     from custom_components.miniflux.coordinator import MinifluxCoordinator
 
     return MinifluxCoordinator(hass, mock_config_entry, fake_client, timedelta(seconds=300))
+
+
+@pytest.fixture
+def entry_with_client(mock_config_entry, coordinator, fake_client, snapshot_factory):
+    """A config entry with runtime_data wired (client + coordinator), the
+    way __init__.py leaves it after setup -- without going through the full
+    setup flow. Phase 5 (services) and Phase 6 (webhook) test against this
+    rather than depending on Phase 3's setup machinery.
+
+    Mutation services (update_entries, mark_all_read) call
+    coordinator.async_request_refresh() as their last step, which triggers a
+    real poll cycle -- get_feeds/get_feed_counters/count_entries need sane
+    defaults here so *any* test that exercises a mutation gets a clean
+    refresh, not just the tests that happen to care about those specific
+    methods.
+    """
+    from custom_components.miniflux import MinifluxRuntimeData
+
+    coordinator.data = snapshot_factory()
+    fake_client.get_feeds.return_value = []
+    fake_client.get_feed_counters.return_value = {"unreads": {}, "reads": {}}
+    fake_client.count_entries.return_value = 0
+    mock_config_entry.runtime_data = MinifluxRuntimeData(
+        client=fake_client, coordinator=coordinator
+    )
+    return mock_config_entry
