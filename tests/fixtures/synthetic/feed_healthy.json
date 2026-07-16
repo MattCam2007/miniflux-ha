@@ -1,0 +1,14 @@
+{
+  "id": 10,
+  "title": "Example Feed",
+  "site_url": "https://example.com",
+  "feed_url": "https://example.com/feed.xml",
+  "checked_at": "2026-07-16T07:55:00Z",
+  "parsing_error_count": 0,
+  "parsing_error_message": "",
+  "disabled": false,
+  "category": {
+    "id": 100,
+    "title": "News"
+  }
+}

@@ -1,0 +1,326 @@
+# Service field definitions for the HA UI (chunk 5.4). Field keys here must
+# exactly match custom_components/miniflux/services.py's FIELD_* constants.
+#
+# Schema/selectors only -- name/description text lives in strings.json's
+# "services" key (chunk 8.2), matching current HA convention (hassfest flags
+# a description present in both places as duplicated).
+
+search_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    feed:
+      required: false
+      selector:
+        text:
+    status:
+      required: false
+      selector:
+        select:
+          options: ["unread", "read", "removed"]
+          multiple: true
+    starred:
+      required: false
+      selector:
+        boolean:
+    search:
+      required: false
+      selector:
+        text:
+    published_within:
+      required: false
+      selector:
+        duration:
+    published_after:
+      required: false
+      selector:
+        datetime:
+    published_before:
+      required: false
+      selector:
+        datetime:
+    order:
+      required: false
+      selector:
+        text:
+    direction:
+      required: false
+      selector:
+        select:
+          options: ["asc", "desc"]
+    limit:
+      required: false
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 500
+    include_content:
+      required: false
+      default: false
+      selector:
+        boolean:
+
+count_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    feed:
+      required: false
+      selector:
+        text:
+    status:
+      required: false
+      selector:
+        select:
+          options: ["unread", "read", "removed"]
+          multiple: true
+    starred:
+      required: false
+      selector:
+        boolean:
+    search:
+      required: false
+      selector:
+        text:
+    published_within:
+      required: false
+      selector:
+        duration:
+    published_after:
+      required: false
+      selector:
+        datetime:
+    published_before:
+      required: false
+      selector:
+        datetime:
+
+get_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    entry_ids:
+      required: true
+      selector:
+        object:
+    include_content:
+      required: false
+      default: true
+      selector:
+        boolean:
+
+get_feeds:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    only_with_errors:
+      required: false
+      default: false
+      selector:
+        boolean:
+
+update_entries:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    entry_ids:
+      required: true
+      selector:
+        object:
+    status:
+      required: false
+      selector:
+        select:
+          options: ["unread", "read", "removed"]
+    starred:
+      required: false
+      selector:
+        boolean:
+
+mark_all_read:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    everything:
+      required: false
+      selector:
+        boolean:
+
+create_feed:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed_url:
+      required: true
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    crawler:
+      required: false
+      selector:
+        boolean:
+
+update_feed:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      required: true
+      selector:
+        text:
+    title:
+      required: false
+      selector:
+        text:
+    category:
+      required: false
+      selector:
+        text:
+    feed_url:
+      required: false
+      selector:
+        text:
+    disabled:
+      required: false
+      selector:
+        boolean:
+    crawler:
+      required: false
+      selector:
+        boolean:
+
+delete_feed:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      required: true
+      selector:
+        text:
+
+refresh_feed:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    feed:
+      required: true
+      selector:
+        text:
+
+refresh_all_feeds:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+
+discover_feeds:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    url:
+      required: true
+      selector:
+        text:
+
+create_category:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    title:
+      required: true
+      selector:
+        text:
+
+update_category:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: true
+      selector:
+        text:
+    title:
+      required: true
+      selector:
+        text:
+
+delete_category:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    category:
+      required: true
+      selector:
+        text:
+
+export_opml:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+
+import_opml:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+    opml:
+      required: true
+      selector:
+        text:
+          multiline: true

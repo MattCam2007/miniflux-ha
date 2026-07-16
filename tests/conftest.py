@@ -1,0 +1,208 @@
+"""Shared test harness for the Miniflux integration test suite."""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+from datetime import UTC, datetime
+from unittest.mock import create_autospec
+
+import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.miniflux.api import MinifluxClient
+from custom_components.miniflux.const import (
+    CONF_API_KEY,
+    CONF_URL,
+    CONF_VERIFY_SSL,
+    CONF_WEBHOOK_ID,
+    DOMAIN,
+    WEBHOOK_HEADER_EVENT_TYPE,
+    WEBHOOK_HEADER_SIGNATURE,
+)
+from custom_components.miniflux.models import CategoryUnread, Entry, Feed, Snapshot
+
+pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Make custom_components/ discoverable in every test (HA hides it by default)."""
+    yield
+
+
+@pytest.fixture
+def make_feed():
+    """Builder for Feed models with sensible defaults; override any field."""
+
+    def _build(**overrides) -> Feed:
+        fields = dict(
+            id=10,
+            title="Example Feed",
+            site_url="https://example.com",
+            feed_url="https://example.com/feed.xml",
+            category_id=100,
+            category_title="News",
+            checked_at=datetime(2026, 7, 16, 8, 0, 0, tzinfo=UTC),
+            parsing_error_count=0,
+            parsing_error_message="",
+            disabled=False,
+        )
+        fields.update(overrides)
+        return Feed(**fields)
+
+    return _build
+
+
+@pytest.fixture
+def make_entry():
+    """Builder for Entry models with sensible defaults; override any field."""
+
+    def _build(**overrides) -> Entry:
+        now = datetime(2026, 7, 16, 8, 0, 0, tzinfo=UTC)
+        fields = dict(
+            id=1,
+            feed_id=10,
+            feed_title="Example Feed",
+            category_id=100,
+            category_title="News",
+            title="Example title",
+            url="https://example.com/a",
+            author="Jane Doe",
+            published_at=now,
+            changed_at=now,
+            status="unread",
+            starred=False,
+            reading_time=5,
+            tags=("tag1", "tag2"),
+        )
+        fields.update(overrides)
+        return Entry(**fields)
+
+    return _build
+
+
+@pytest.fixture
+def snapshot_factory():
+    """Builder for Snapshot models with tunable unread/starred/error-feed state."""
+
+    def _build(
+        *,
+        fetched_at: datetime | None = None,
+        unread_total: int = 0,
+        starred_total: int = 0,
+        unread_by_feed: dict[int, int] | None = None,
+        unread_by_category: tuple[CategoryUnread, ...] = (),
+        feeds: tuple[Feed, ...] = (),
+        error_feeds: tuple[Feed, ...] = (),
+    ) -> Snapshot:
+        return Snapshot(
+            fetched_at=fetched_at or datetime(2026, 7, 16, 8, 0, 0, tzinfo=UTC),
+            feeds=feeds,
+            unread_total=unread_total,
+            unread_by_feed=unread_by_feed or {},
+            unread_by_category=unread_by_category,
+            starred_total=starred_total,
+            error_feeds=error_feeds,
+        )
+
+    return _build
+
+
+@pytest.fixture
+def signed_webhook_request():
+    """Build a (raw_body, headers) pair signed the way Miniflux is assumed to
+    sign webhooks (hex HMAC-SHA256 over the raw body — ASSUMED (R1)).
+
+    Mirrors ``signature.py``'s scheme independently (does not import or call
+    it) so that a test asserting the two agree (test_signature.py) is a real
+    check, not a tautology. If R1 finds the scheme differs, both this helper
+    and signature.verify change together.
+    """
+
+    def _build(
+        secret: str, payload: dict, *, event_type: str = "new_entries"
+    ) -> tuple[bytes, dict[str, str]]:
+        raw_body = json.dumps(payload).encode("utf-8")
+        sig = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+        headers = {
+            WEBHOOK_HEADER_SIGNATURE: sig,
+            WEBHOOK_HEADER_EVENT_TYPE: event_type,
+            "Content-Type": "application/json",
+        }
+        return raw_body, headers
+
+    return _build
+
+
+@pytest.fixture
+def mock_config_entry_data():
+    """Plain-dict config-entry data for the Miniflux integration."""
+    return {
+        CONF_URL: "https://reader.example.lan",
+        CONF_API_KEY: "test-api-key",
+        CONF_VERIFY_SSL: True,
+        CONF_WEBHOOK_ID: "test-webhook-id",
+    }
+
+
+@pytest.fixture
+def mock_config_entry(hass, mock_config_entry_data):
+    """A MockConfigEntry already added to hass, for Phase 3+ tests that need
+    a real config entry (coordinator, __init__ setup, services, webhook)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="reader.example.lan:1",
+        data=mock_config_entry_data,
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+@pytest.fixture
+def fake_client():
+    """An autospec'd MinifluxClient stand-in: same public method signatures
+    as the real client (so it can't silently drift from api.py), each an
+    AsyncMock configurable per-test via `.return_value`/`.side_effect`."""
+    return create_autospec(MinifluxClient, instance=True)
+
+
+@pytest.fixture
+def coordinator(hass, mock_config_entry, fake_client):
+    """A real, unpolled MinifluxCoordinator. Tests inject state directly via
+    `coordinator.data = ...` / `.last_update_success = ...` rather than
+    running an actual poll cycle -- entity tests (Phase 4) and anything else
+    that only needs to render a given coordinator state, not exercise the
+    polling machinery itself (that's coordinator.py's own tests, Phase 3)."""
+    from datetime import timedelta
+
+    from custom_components.miniflux.coordinator import MinifluxCoordinator
+
+    return MinifluxCoordinator(hass, mock_config_entry, fake_client, timedelta(seconds=300))
+
+
+@pytest.fixture
+def entry_with_client(mock_config_entry, coordinator, fake_client, snapshot_factory):
+    """A config entry with runtime_data wired (client + coordinator), the
+    way __init__.py leaves it after setup -- without going through the full
+    setup flow. Phase 5 (services) and Phase 6 (webhook) test against this
+    rather than depending on Phase 3's setup machinery.
+
+    Mutation services (update_entries, mark_all_read) call
+    coordinator.async_request_refresh() as their last step, which triggers a
+    real poll cycle -- get_feeds/get_feed_counters/count_entries need sane
+    defaults here so *any* test that exercises a mutation gets a clean
+    refresh, not just the tests that happen to care about those specific
+    methods.
+    """
+    from custom_components.miniflux import MinifluxRuntimeData
+
+    coordinator.data = snapshot_factory()
+    fake_client.get_feeds.return_value = []
+    fake_client.get_feed_counters.return_value = {"unreads": {}, "reads": {}}
+    fake_client.count_entries.return_value = 0
+    mock_config_entry.runtime_data = MinifluxRuntimeData(
+        client=fake_client, coordinator=coordinator
+    )
+    return mock_config_entry

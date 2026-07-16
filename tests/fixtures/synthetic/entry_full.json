@@ -1,0 +1,30 @@
+{
+  "id": 1001,
+  "feed_id": 10,
+  "status": "unread",
+  "title": "Example Article Title",
+  "url": "https://example.com/articles/1001",
+  "author": "Jane Doe",
+  "content": "<p>Full article body.</p>",
+  "starred": false,
+  "reading_time": 5,
+  "published_at": "2026-07-16T08:00:00Z",
+  "changed_at": "2026-07-16T08:05:00Z",
+  "created_at": "2026-07-16T08:01:00Z",
+  "hash": "abc123def456",
+  "tags": ["tech", "news"],
+  "feed": {
+    "id": 10,
+    "title": "Example Feed",
+    "site_url": "https://example.com",
+    "feed_url": "https://example.com/feed.xml",
+    "checked_at": "2026-07-16T07:55:00Z",
+    "parsing_error_count": 0,
+    "parsing_error_message": "",
+    "disabled": false,
+    "category": {
+      "id": 100,
+      "title": "News"
+    }
+  }
+}

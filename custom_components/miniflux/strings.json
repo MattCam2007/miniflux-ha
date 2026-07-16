@@ -1,0 +1,414 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Miniflux",
+        "description": "Enter your Miniflux server address and an API key (create one in Miniflux under Settings → API Keys).",
+        "data": {
+          "url": "Server URL",
+          "api_key": "API key",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Miniflux",
+        "description": "The API key for this Miniflux instance no longer works. Enter a new one.",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key.",
+      "cannot_connect": "Could not connect to the Miniflux server. Check the URL and that it is reachable.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Miniflux instance and user are already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Miniflux options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)"
+        }
+      },
+      "webhook": {
+        "title": "Webhook",
+        "description": "Copy this URL into Miniflux (Settings → Integrations → Webhook), save it there, then paste the secret Miniflux generates back here:\n\n{webhook_url}\n\nUntil the secret is saved here, deliveries are rejected by design (unverifiable payloads never become events).",
+        "data": {
+          "webhook_secret": "Webhook secret",
+          "local_only": "Local network only"
+        }
+      }
+    },
+    "error": {
+      "scan_interval_too_low": "Poll interval is too low."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "unread_entries": { "name": "Unread entries" },
+      "starred_entries": { "name": "Starred entries" },
+      "feeds_with_errors": { "name": "Feeds with errors" }
+    },
+    "binary_sensor": {
+      "reachable": { "name": "Reachable" }
+    }
+  },
+  "services": {
+    "search_entries": {
+      "name": "Search entries",
+      "description": "Query entries with the shared filter contract (category/feed/status/starred/search/date range), paginated internally up to the given limit.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "category": {
+          "name": "Category",
+          "description": "Category id or exact title."
+        },
+        "feed": {
+          "name": "Feed",
+          "description": "Feed id or exact title."
+        },
+        "status": {
+          "name": "Status",
+          "description": "One or more of unread/read/removed. Omit or pass an empty list to match any status."
+        },
+        "starred": {
+          "name": "Starred"
+        },
+        "search": {
+          "name": "Search",
+          "description": "Free-text search."
+        },
+        "published_within": {
+          "name": "Published within",
+          "description": "Duration window ending now. Cannot be combined with published after/published before."
+        },
+        "published_after": {
+          "name": "Published after"
+        },
+        "published_before": {
+          "name": "Published before"
+        },
+        "order": {
+          "name": "Order"
+        },
+        "direction": {
+          "name": "Direction"
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum entries to return (auto-paginated internally up to this count)."
+        },
+        "include_content": {
+          "name": "Include content",
+          "description": "Include full article HTML in the response. Off by default to keep responses small."
+        }
+      }
+    },
+    "count_entries": {
+      "name": "Count entries",
+      "description": "Cheap pre-flight count using the same filter contract as Search entries, without fetching entry bodies.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "category": {
+          "name": "Category",
+          "description": "Category id or exact title."
+        },
+        "feed": {
+          "name": "Feed",
+          "description": "Feed id or exact title."
+        },
+        "status": {
+          "name": "Status",
+          "description": "One or more of unread/read/removed. Omit or pass an empty list to match any status."
+        },
+        "starred": {
+          "name": "Starred"
+        },
+        "search": {
+          "name": "Search",
+          "description": "Free-text search."
+        },
+        "published_within": {
+          "name": "Published within",
+          "description": "Duration window ending now. Cannot be combined with published after/published before."
+        },
+        "published_after": {
+          "name": "Published after"
+        },
+        "published_before": {
+          "name": "Published before"
+        }
+      }
+    },
+    "get_entries": {
+      "name": "Get entries",
+      "description": "Hydrate specific entries by id -- the counterpart to compact webhook events.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "entry_ids": {
+          "name": "Entry IDs",
+          "description": "Entry ids to hydrate (e.g. from a miniflux_new_entries event). Ids that no longer exist are returned in `missing`, not treated as an error."
+        },
+        "include_content": {
+          "name": "Include content",
+          "description": "Include full article HTML. On by default, since hydrating entries usually means you want the body."
+        }
+      }
+    },
+    "get_feeds": {
+      "name": "Get feeds",
+      "description": "List feeds, optionally filtered by category or narrowed to feeds currently failing to parse.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "category": {
+          "name": "Category",
+          "description": "Category id or exact title."
+        },
+        "only_with_errors": {
+          "name": "Only with errors",
+          "description": "Only return feeds with a non-zero parsing error count."
+        }
+      }
+    },
+    "update_entries": {
+      "name": "Update entries",
+      "description": "Declarative status/starred update over an explicit list of entry ids -- never a scope. At least one of Status/Starred is required.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "entry_ids": {
+          "name": "Entry IDs",
+          "description": "Exactly these entries are affected -- never a scope."
+        },
+        "status": {
+          "name": "Status"
+        },
+        "starred": {
+          "name": "Starred",
+          "description": "Declarative -- entries already in the target state are left untouched (idempotent, safe to retry)."
+        }
+      }
+    },
+    "mark_all_read": {
+      "name": "Mark all read",
+      "description": "Marks an entire scope as read. Prefer Update entries with an explicit id list for pipeline automations -- entries that arrive between a query and this call would be silently marked read without ever being processed. This service is for the human \"declare inbox bankruptcy\" case.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "feed": {
+          "name": "Feed",
+          "description": "Exactly one of Feed/Category/Everything is required."
+        },
+        "category": {
+          "name": "Category"
+        },
+        "everything": {
+          "name": "Everything",
+          "description": "Mark every entry across the whole instance as read."
+        }
+      }
+    },
+    "create_feed": {
+      "name": "Create feed",
+      "description": "Subscribe to a new feed.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "feed_url": {
+          "name": "Feed URL"
+        },
+        "category": {
+          "name": "Category",
+          "description": "Category id or exact title."
+        },
+        "crawler": {
+          "name": "Crawler",
+          "description": "Use the headless-browser crawler for this feed instead of a plain HTTP fetch."
+        }
+      }
+    },
+    "update_feed": {
+      "name": "Update feed",
+      "description": "Update one or more mutable fields on an existing feed.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "feed": {
+          "name": "Feed",
+          "description": "Feed id or exact title."
+        },
+        "title": {
+          "name": "Title"
+        },
+        "category": {
+          "name": "Category",
+          "description": "Category id or exact title."
+        },
+        "feed_url": {
+          "name": "Feed URL"
+        },
+        "disabled": {
+          "name": "Disabled"
+        },
+        "crawler": {
+          "name": "Crawler",
+          "description": "Use the headless-browser crawler for this feed instead of a plain HTTP fetch."
+        }
+      }
+    },
+    "delete_feed": {
+      "name": "Delete feed",
+      "description": "Permanently deletes a feed and its entries from Miniflux. Not reversible.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "feed": {
+          "name": "Feed",
+          "description": "Feed id or exact title."
+        }
+      }
+    },
+    "refresh_feed": {
+      "name": "Refresh feed",
+      "description": "Fetch a single feed now instead of waiting for its schedule.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "feed": {
+          "name": "Feed",
+          "description": "Feed id or exact title."
+        }
+      }
+    },
+    "refresh_all_feeds": {
+      "name": "Refresh all feeds",
+      "description": "Refreshes every feed on the instance. Separate from Refresh feed on purpose -- the two can never be confused by a missing argument.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        }
+      }
+    },
+    "discover_feeds": {
+      "name": "Discover feeds",
+      "description": "Probes a site URL for candidate RSS/Atom feeds, without subscribing to any of them.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "url": {
+          "name": "URL"
+        }
+      }
+    },
+    "create_category": {
+      "name": "Create category",
+      "description": "Create a new category.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "title": {
+          "name": "Title"
+        }
+      }
+    },
+    "update_category": {
+      "name": "Update category",
+      "description": "Rename a category.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "category": {
+          "name": "Category",
+          "description": "Category id or exact title."
+        },
+        "title": {
+          "name": "Title"
+        }
+      }
+    },
+    "delete_category": {
+      "name": "Delete category",
+      "description": "Deletes a category. Feeds in it become uncategorized in Miniflux; they are not deleted.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "category": {
+          "name": "Category",
+          "description": "Category id or exact title."
+        }
+      }
+    },
+    "export_opml": {
+      "name": "Export OPML",
+      "description": "Returns the instance's full feed list as an OPML string. Useful for a scheduled backup automation.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        }
+      }
+    },
+    "import_opml": {
+      "name": "Import OPML",
+      "description": "Import feeds and categories from an OPML document.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        },
+        "opml": {
+          "name": "OPML"
+        }
+      }
+    }
+  },
+  "issues": {
+    "webhook_secret_missing": {
+      "title": "Miniflux webhook secret is not configured",
+      "description": "The webhook endpoint for {instance_url} is live, but no secret is configured, so every delivery is being rejected with HTTP 401. Open this integration's Configure → Webhook step, paste the secret Miniflux generated when you saved the webhook URL there, and save."
+    },
+    "webhook_signature_failing": {
+      "title": "Miniflux webhook deliveries are failing verification",
+      "description": "Several deliveries in a row from {instance_url} failed signature verification. This usually means the secret was regenerated (for example, the webhook URL was re-saved in Miniflux) and no longer matches what's configured here. Open this integration's Configure → Webhook step and re-paste the current secret from Miniflux."
+    }
+  }
+}

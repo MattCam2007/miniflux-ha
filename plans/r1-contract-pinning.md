@@ -1,0 +1,262 @@
+# R1 — Contract-Pinning Checklist — ✅ CLOSED (2026-07-16)
+
+**Status:** this checklist has been run in full (Sections A, B, C) against a real Miniflux 2.3.2 instance, and every wire-contract assumption it targeted is now confirmed — including, on a second B4 pass with the correct webhook secret, the signature scheme itself. See the "Answered" block at the bottom and `plans/decisions-and-assumed-contract.md` for the full reconciliation. Kept here as reference/history and in case a future instance (a version upgrade, a second Miniflux server) needs a re-check — not as an open task.
+
+**Why (historical):** the design confines every exact Miniflux wire detail (auth header, field names, `total`/pagination, `/v1/version` presence, `/v1/feeds/counters` presence, webhook header names + payload shapes + signature scheme) to `api.py` + `normalize.py` + fixtures. This checklist captured those from **your** instance into `tests/fixtures/`, so the Phase-2 client was written against real bytes, not assumptions.
+
+**Where to run:** any box that can reach Miniflux **and** has this repo checked out (commands write into `tests/fixtures/`). Run from the repo root — a machine on your LAN, since this instance (like the coding agent building this integration) is only reachable from inside your network, not from the internet. Everything below is copy-paste; you only edit one `export` line in Step 0.
+
+**Time:** ~10 min. Read-only Section A is safe. Section B needs a throwaway feed (reversible). Section C is optional and self-contained.
+
+### Your instance — already known (2026-07-16, from your `docker-compose.yml` + URL)
+
+These are filled in below so you don't have to re-derive them; nothing here needed a live query.
+
+- **Base URL:** `http://192.168.3.80:8080` — no trailing slash, no sub-path (you shared the `/unread` frontend route; the API base is everything before that). Plain `http://`, not `https://` — there's no TLS in front of this container, so **`verify_ssl` is moot for this instance** and the HA config flow's URL field should be entered exactly as `http://192.168.3.80:8080`.
+- **Deployment:** official `miniflux/miniflux:latest` Docker image, Postgres backend, port `8080` mapped straight through with no reverse proxy in between. This resolves R9 (sub-path/proxy topology) **for this instance**: none of that applies here — a bare host:port is the whole story.
+- **Auth scheme:** API key via `X-Auth-Token` (not Basic auth) — you generated a key rather than using the admin username/password, so the smoke test below is exercising the token path, which is what `api.py` is built against.
+- **Exact Miniflux version:** still unknown — `latest` is a mutable tag, so only your own instance's `/v1/version` response (Section A, first thing you check) tells us what actually got pulled. Don't skip that check even though the rest of this is filled in.
+
+**A note on the API key you already sent me:** it's real and I'm not writing it into this file — this doc gets committed to the repo, and a live credential doesn't belong in git history even in a personal project (see Step Z's reasoning, which already made this call before I got here). Paste it into the `export TOK=` line yourself, right before you run Step 0, so it only ever lives in your shell's environment.
+
+---
+
+## Step 0 — set your API key (the only editing you do)
+
+```bash
+export MF="http://192.168.3.80:8080"        # your Miniflux base URL — filled in above, no trailing slash
+export TOK="paste-your-api-key-here"        # the key you already generated (Miniflux → Settings → API Keys) — not repeated in this file on purpose, see note above
+export FX="tests/fixtures"; mkdir -p "$FX"
+mf() { curl -sS -D "$FX/$1.headers" -o "$FX/$1.json" -H "X-Auth-Token: $TOK" "$MF$2"; echo "  saved $FX/$1.json"; }
+```
+
+> Using **Basic auth** instead of an API key? Redefine the helper once:
+> `mf() { curl -sS -D "$FX/$1.headers" -o "$FX/$1.json" -u "user:pass" "$MF$2"; echo "  saved $FX/$1.json"; }`
+> and note "auth = basic" in the report at the bottom.
+
+### Smoke test (do this before anything else)
+
+```bash
+mf me /v1/me && python3 -m json.tool "$FX/me.json"
+```
+
+You should see your Miniflux user JSON. If you get an error, fix `$MF`/`$TOK` before continuing.
+✅ This confirms the auth header name (`X-Auth-Token`) — assumption in `api.py` chunk 2.1.
+
+---
+
+## Section A — REST shapes (read-only, safe)
+
+Paste this whole block; it captures every read endpoint the integration polls or queries:
+
+```bash
+mf version_v1   /v1/version
+mf version_root /version
+mf feeds        /v1/feeds
+mf counters     /v1/feeds/counters
+mf categories   /v1/categories
+mf entries_unread  "/v1/entries?status=unread&limit=1"
+mf entries_starred "/v1/entries?starred=true&limit=1"
+mf entries_search  "/v1/entries?search=the&limit=1"
+echo "done - files in $FX"
+```
+
+Then eyeball the important ones (small, phone-friendly):
+
+```bash
+python3 -m json.tool "$FX/feeds.json"    | head -60
+python3 -m json.tool "$FX/counters.json" | head -30
+python3 -m json.tool "$FX/entries_unread.json" | head -80
+```
+
+### Confirm while you look (these map to specific code assumptions)
+
+**`version_v1` / `version_root`** — which one returned real content (HTTP 200 + a version), which 404'd?
+→ tells `api.get_version` (2.2) which path to use / whether to fall back. Check status:
+```bash
+grep -H "^HTTP" "$FX/version_v1.headers" "$FX/version_root.headers"
+```
+
+**`feeds.json`** — confirm each feed object has: `parsing_error_count`, `parsing_error_message`, `checked_at`, `disabled`, and a nested `category` with `id` + `title`.
+→ drives `normalize.feed_from_json` (1.3), `rollup` (1.7), the feeds-with-errors sensor (4.4). If a feed name differs, that's the pin.
+
+**`counters.json`** — did it 200 with `unreads`/`reads` maps keyed by feed id? Or 404?
+→ if absent, `rollup` (1.7) must derive unread from feeds/entries instead — flag it. This is the single most important "does it exist" check.
+
+**`entries_unread.json`** — confirm the top level has a **`total`** count and an **`entries`** array, and each entry has: `id`, `status`, `starred`, `title`, `url`, `author`, `content`, `reading_time`, `published_at`, `changed_at`, `tags`, and nested `feed`/`category`.
+→ drives `normalize.entry_from_json` (1.3), the `models.Entry` field list (1.1), pagination `total` (2.3).
+
+**`entries_search.json` / `entries_starred.json`** — confirm `search=`, `starred=true` actually filtered (compare `total`).
+→ confirms filter param names for `filters.to_query_params` (1.4).
+
+---
+
+## Section B — Webhook capture (headers + both payloads + signature scheme)
+
+This is the part only a live instance can give you. You'll run a tiny catch server, point Miniflux at it, trigger both event types, then verify the signature.
+
+### B1 — start the catch server (leave it running in this shell)
+
+```bash
+python3 - <<'PY'
+import http.server, socketserver, time, os
+d="tests/fixtures/webhook_capture"; os.makedirs(d, exist_ok=True)
+class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        n=int(self.headers.get('Content-Length',0)); body=self.rfile.read(n)
+        ts=time.strftime('%H%M%S'); base=f"{d}/{ts}"
+        open(base+'.headers','w').write(self.requestline+'\n'+str(self.headers))
+        open(base+'.body.json','wb').write(body)
+        print('\n=== captured',ts,'===\n'+str(self.headers))
+        print(body.decode('utf-8','replace')[:1500])
+        self.send_response(200); self.end_headers(); self.wfile.write(b'ok')
+    def log_message(self,*a): pass
+print('listening on :8099  — point Miniflux webhook here, Ctrl-C when done')
+socketserver.TCPServer(("0.0.0.0",8099),H).serve_forever()
+PY
+```
+
+The server saves each delivery's **exact headers** (reveals the signature + event-type header names) and **raw body bytes** (needed to verify the HMAC). It prints each hit so you can watch on your phone.
+
+### B2 — point Miniflux at it (in the Miniflux web UI)
+
+1. Settings → Integrations → **Webhook**.
+2. Webhook URL: `http://<this-box-ip>:8099/`  (an IP/host Miniflux can reach — same LAN is fine).
+3. **Save.** Miniflux shows a generated **Webhook secret** — copy it, you'll need it in B4 (and later for real HA setup).
+
+> **If Miniflux and this box are both on a private LAN** (the normal case), check its logs before assuming B3 is broken:
+> ```bash
+> docker compose logs --tail=80 miniflux | grep -iE 'webhook|integration'
+> ```
+> If you see `connection to private network is blocked: ... resolves to a non-public IP address`, that's Miniflux's own SSRF protection (≥ 2.2.18) refusing to send anywhere on a private network — including your own capture box. Add `INTEGRATION_ALLOW_PRIVATE_NETWORKS=1` to **Miniflux's** environment and recreate it (`docker compose up -d` — a plain restart won't pick up the new var), then retry B3. This isn't specific to the capture step: it's the same setting `docs/setup.md` documents as a real-HA prerequisite, so finding it here saves hitting it again later.
+
+### B3 — trigger both events
+
+- **`new_entries`:** the reliable trick — **add a brand-new feed** (Feeds → Add feed → any active blog's RSS URL). Its first fetch makes every entry "new," which fires `new_entries` within a minute. (Keep this feed for Section C, or delete it after.)
+- **`save_entry`:** open any entry in Miniflux and click **Save** (the save/share action). Fires `save_entry`.
+
+Watch the catch-server shell — you should see two captures. Then `Ctrl-C` the server.
+
+```bash
+ls -la tests/fixtures/webhook_capture/
+```
+
+### B4 — verify the signature scheme
+
+> **This is not your API key (`$TOK`).** It's a separate value Miniflux generates specifically when you save the webhook URL in B2, shown on that same Settings → Integrations → Webhook page (labeled **Webhook secret**). Reusing the API key here is an easy mistake — both are similar-looking hex strings you already have handy — but it silently produces a signature mismatch that looks exactly like "the scheme is wrong," when the scheme is actually fine and it's just the wrong key.
+
+```bash
+export WHSECRET="paste-the-webhook-secret-from-B2"
+python3 - <<'PY'
+import hmac, hashlib, glob, os
+sec=os.environ["WHSECRET"].encode()
+for b in sorted(glob.glob("tests/fixtures/webhook_capture/*.body.json")):
+    raw=open(b,'rb').read()
+    print(os.path.basename(b), "computed HMAC-SHA256 hex =", hmac.new(sec, raw, hashlib.sha256).hexdigest())
+PY
+grep -Ri "signature\|event-type\|event_type" tests/fixtures/webhook_capture/*.headers
+```
+
+**Compare** each `computed HMAC` against the signature value in the matching `.headers` file.
+- Match → confirms **hex-encoded HMAC-SHA256 over the raw body** (the assumption in `signature.verify`, chunk 1.5). ✅
+- No match → note the header value; we'll adjust the scheme (base64? different digest?) before writing 1.5.
+- The `grep` line reveals the **exact header names** (expected around `X-Miniflux-Signature` and `X-Miniflux-Event-Type`) → pins `signature.extract_event_type` (1.5) + the handler (6.2).
+
+### B5 — reset Miniflux
+
+Put the Webhook URL back to blank (or to your real HA URL later per `docs/setup.md`). Done with capture.
+
+---
+
+## Section C — Mutations (optional, self-contained, reversible)
+
+Only pins the mutation **request bodies**. Uses the throwaway feed from B3 so it never touches real data. Skip if short on time — official API body shapes are stable.
+
+Grab one feed id and one entry id from that scratch feed:
+
+```bash
+mf feeds /v1/feeds
+export FEED_ID=$(python3 -c "import json;d=json.load(open('$FX/feeds.json'));print(sorted(d,key=lambda f:f['id'])[-1]['id'])")
+mf scratch_entries "/v1/feeds/$FEED_ID/entries?limit=1"
+export ENTRY_ID=$(python3 -c "import json;print(json.load(open('$FX/scratch_entries.json'))['entries'][0]['id'])")
+echo "FEED_ID=$FEED_ID  ENTRY_ID=$ENTRY_ID"
+```
+
+Round-trip each mutation (each prints its HTTP status; all reversible):
+
+```bash
+# bulk status: read then back to unread  -> pins PUT /v1/entries body (chunk 2.4 / service 5.2)
+curl -sS -X PUT -H "X-Auth-Token: $TOK" -H "Content-Type: application/json" -w "  entries->read  HTTP %{http_code}\n"   -d "{\"entry_ids\":[$ENTRY_ID],\"status\":\"read\"}"   "$MF/v1/entries"
+curl -sS -X PUT -H "X-Auth-Token: $TOK" -H "Content-Type: application/json" -w "  entries->unread HTTP %{http_code}\n" -d "{\"entry_ids\":[$ENTRY_ID],\"status\":\"unread\"}" "$MF/v1/entries"
+
+# star toggle (twice = net no change)  -> confirms toggle semantics behind declarative star (D8, chunk 2.4)
+curl -sS -X PUT -H "X-Auth-Token: $TOK" -w "  bookmark toggle1 HTTP %{http_code}\n" "$MF/v1/entries/$ENTRY_ID/bookmark"
+curl -sS -X PUT -H "X-Auth-Token: $TOK" -w "  bookmark toggle2 HTTP %{http_code}\n" "$MF/v1/entries/$ENTRY_ID/bookmark"
+
+# scope mark-all-read on the scratch feed  -> pins mark-all endpoint (service 5.2)
+curl -sS -X PUT -H "X-Auth-Token: $TOK" -w "  feed mark-all-read HTTP %{http_code}\n" "$MF/v1/feeds/$FEED_ID/mark-all-as-read"
+
+# single-feed refresh  -> pins refresh endpoint (service 5.3)
+curl -sS -X PUT -H "X-Auth-Token: $TOK" -w "  feed refresh HTTP %{http_code}\n" "$MF/v1/feeds/$FEED_ID/refresh"
+```
+
+All `HTTP 2xx` → those endpoints/bodies are confirmed. Any `4xx` → copy the number into the report.
+
+Clean up the throwaway feed when done:
+
+```bash
+curl -sS -X DELETE -H "X-Auth-Token: $TOK" -w "  delete scratch feed HTTP %{http_code}\n" "$MF/v1/feeds/$FEED_ID"
+```
+
+---
+
+## Step Z — commit the fixtures & report back
+
+Redact nothing structural, but **do not commit the webhook secret or your API key** (they're only in env vars, not files — good). The captured bodies contain your feed content; if that's sensitive, trim `content` fields before committing or keep fixtures in a private note. Then:
+
+```bash
+git add tests/fixtures && git commit -m "Add R1 contract-pinning fixtures from live Miniflux" && echo committed
+```
+
+**Paste me these answers** (this is what unblocks Phase 2 — copy the list, fill it in):
+
+```
+Miniflux version:                 __________   (from version_v1/version_root)
+Auth: token (X-Auth-Token) or basic? __________
+/v1/version present?              yes / no  (which path: /v1/version or /version)
+/v1/feeds/counters present?       yes / no
+Entries response has top-level `total`?  yes / no
+Signature header name:            __________   (from B4 grep)
+Event-type header name:           __________
+Signature scheme confirmed HMAC-SHA256 hex over raw body?  yes / no  (from B4 compare)
+Any field-name surprises in feeds/entries vs the lists above? __________
+Any mutation returning non-2xx?   __________
+```
+
+### Answered (2026-07-16 run) — see `plans/decisions-and-assumed-contract.md` for the full reconciliation
+
+```
+Miniflux version:                 2.3.2  (from the webhook delivery's User-Agent header)
+Auth: token (X-Auth-Token) or basic? token — confirmed via smoke test
+/v1/version present?              yes — /v1/version 200s; /version 302s (doesn't matter, v1 always answers)
+/v1/feeds/counters present?       yes
+Entries response has top-level `total`?  yes (700)
+Signature header name:            X-Miniflux-Signature — confirmed exact
+Event-type header name:           X-Miniflux-Event-Type — confirmed exact
+Signature scheme confirmed HMAC-SHA256 hex over raw body?  YES — first B4 pass used the API key by
+                                   mistake instead of the real webhook secret (easy mix-up, both look
+                                   like similar hex strings), which produced a mismatch that looked
+                                   like a scheme problem but wasn't. Re-ran B4 with the actual secret
+                                   from Miniflux's webhook settings page: all three captured
+                                   deliveries' computed digests matched their header value
+                                   byte-for-byte. Confirmed for real.
+Any field-name surprises in feeds/entries vs the lists above? One real, harmless one: webhook
+                                   new_entries' per-entry objects (inside "entries") have no nested
+                                   "feed" key — only the envelope's top-level "feed" does. Doesn't
+                                   affect the fired event (EntryCompact never reads those fields).
+Any mutation returning non-2xx?   No — all five Section C mutations returned 204.
+```
+
+**R1 is closed.** The only item never exercised was `published_after`/`published_before` (Section A tested status/starred/search but not a date-range filter) — kept as a documented low-risk assumption in `const.py`/`plans/decisions-and-assumed-contract.md` rather than reopened as blocking, since a wrong guess there would surface loudly and immediately, unlike the webhook signature this run just confirmed for real.
+
+With this, `const.py` header/param constants, `normalize.py` field maps, and `signature.py`'s verification scheme are all frozen against real data — the "written against assumptions" risk (R1) is closed.
