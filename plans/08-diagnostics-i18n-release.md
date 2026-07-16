@@ -44,6 +44,12 @@ Order: 8.1 diagnostics → 8.2 translations → 8.3 README/brand/license → 8.4
 
 **DoD:** hassfest green on translations; no code-raised key lacks a string.
 
+**Resolved during implementation — services.yaml no longer carries name/description text:** checking real bundled HA components (e.g. `rachio`) that ship both files confirmed the current convention: `services.yaml` holds schema/selectors only, and `strings.json`'s `services` key is the *only* place service/field names and descriptions live (a description present in both is a hassfest duplication warning). The Phase 5 `services.yaml` had inline `description:` text for the top-level services and several fields (written before this was researched) -- it's been stripped down to schema-only, and all of that text was relocated into `strings.json`. `tests/test_translations.py::TestServiceStrings::test_no_service_or_field_text_left_in_services_yaml` guards against text creeping back into the wrong file.
+
+**Resolved during implementation — a real entity-name/entity_id mismatch, closed by adding strings.json:** `sensor.py`/`binary_sensor.py` (Phase 4) already set `_attr_translation_key` on all four entities (`unread_entries`, `starred_entries`, `feeds_with_errors`, `reachable`), anticipating this phase -- but with no `strings.json` to resolve those keys against, HA fell back to the binary sensor's `device_class`-based default name ("Connectivity"), producing `binary_sensor.miniflux_connectivity` instead of the `binary_sensor.miniflux_reachable` that `docs/architecture.md`/`docs/setup.md` had already documented since the architecture phase. Adding `strings.json` fixes this for real (verified end-to-end, not just JSON-schema-checked: `tests/test_init.py::TestSetup::test_entity_ids_match_the_ones_documented_in_setup_md` runs a full `hass.config_entries.async_setup()` and asserts the exact documented entity_ids exist). No prior release exists, so there's no entity_id-churn concern for real installs.
+
+**Resolved during implementation -- hassfest is real CI, not a documentation aspiration:** `.github/workflows/validate.yml` (from Phase 0) already runs the actual `home-assistant/actions/hassfest@master` action on push/PR -- it isn't merely "ruff + pytest" as `test.yml` alone would suggest. hassfest itself isn't runnable locally (it ships in the HA core git repo's `script/` tree, not the PyPI `homeassistant` package this project's venv installs), so the services.yaml/strings.json split and translation file structure above were verified by close reading of real installed HA source and real bundled components rather than a local dry run; `validate.yml`'s next run against this branch is the authoritative check.
+
 ---
 
 ## Chunk 8.3 — README, brand/logo, license
@@ -59,6 +65,8 @@ Order: 8.1 diagnostics → 8.2 translations → 8.3 README/brand/license → 8.4
 - a link-check / presence test that README references install, setup.md, and lists all four entities + the four event types + the service names (guards against README drifting from the code).
 
 **DoD:** README renders in HACS; known-limitations honestly lists R3 + replay; brand path documented.
+
+**Resolved during implementation:** `LICENSE` (MIT) already existed from repo creation, matching the user's "license - i dont care" / MIT decision recorded in `plans/decisions-and-assumed-contract.md` -- no new file needed, just verified. The presence-test in `tests/test_readme.py` checks section anchors' *target headings exist in the linked doc*, not that the anchor fragment itself resolves (no network/browser in tests) -- the `#part-2--...`/`#35-...` fragments in the README were hand-traced against GitHub's actual heading-slug algorithm (lowercase, strip punctuation, spaces→hyphens, so an em-dash between words produces a double-hyphen) rather than guessed.
 
 ---
 
@@ -78,6 +86,8 @@ Order: 8.1 diagnostics → 8.2 translations → 8.3 README/brand/license → 8.4
 - manual: add as HACS custom repo → install → configure → four entities → run the setup.md verification (force a Miniflux refresh → `miniflux_new_entries` event + `last_webhook_at` updates).
 
 **DoD:** a `v0.1.0` release exists and installs via HACS custom repository; overview §8 whole-integration DoD satisfied.
+
+**Resolved during implementation -- code-complete stops short of actually publishing:** everything in this chunk that's local, reversible, and code (manifest version, full-suite-green, coverage floors, README/LICENSE) was completed as part of the same TDD build as every other phase. Actually tagging and publishing a GitHub Release is a distinct, public, hard-to-reverse action this session did not take unilaterally -- it wasn't something the user explicitly asked for (the request was to build the integration, not cut a release), so it's left as an explicit decision point for the user rather than assumed. The "manual acceptance step" (install-from-release in a clean HA) is inherently something only the user can do regardless.
 
 ---
 

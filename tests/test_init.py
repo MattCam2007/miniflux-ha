@@ -108,6 +108,22 @@ class TestSetup:
         assert len(sensor_ids) == 4
         assert entry.runtime_data.client is not None
 
+    async def test_entity_ids_match_the_ones_documented_in_setup_md(self, hass):
+        """Phase 8: strings.json gives each entity's translation_key a real
+        name, which is what has_entity_name entities slugify their entity_id
+        from. This is the end-to-end check that docs/setup.md's documented
+        entity_ids (sensor.miniflux_unread_entries et al.) are what setup
+        actually produces, not just that strings.json parses."""
+        entry = _make_entry(hass)
+        with _patched_client(feeds=[]):
+            await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+
+        assert hass.states.get("sensor.miniflux_unread_entries") is not None
+        assert hass.states.get("sensor.miniflux_starred_entries") is not None
+        assert hass.states.get("sensor.miniflux_feeds_with_errors") is not None
+        assert hass.states.get("binary_sensor.miniflux_reachable") is not None
+
     async def test_connection_error_sets_setup_retry(self, hass):
         entry = _make_entry(hass)
         with _patched_client(get_feeds_error=errors.MinifluxConnectionError("refused")):
