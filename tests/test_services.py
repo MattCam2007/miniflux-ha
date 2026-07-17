@@ -27,6 +27,7 @@ from custom_components.miniflux.const import (
     SERVICE_DELETE_FEED,
     SERVICE_DISCOVER_FEEDS,
     SERVICE_EXPORT_OPML,
+    SERVICE_GET_CATEGORIES,
     SERVICE_GET_ENTRIES,
     SERVICE_GET_FEEDS,
     SERVICE_IMPORT_OPML,
@@ -39,6 +40,7 @@ from custom_components.miniflux.const import (
     SERVICE_UPDATE_FEED,
     UPDATE_IDS_MAX,
 )
+from custom_components.miniflux.models import Category, CategoryUnread
 from custom_components.miniflux.services import _resolve_entry, _run, async_register_services
 
 NOW = datetime(2026, 7, 16, 8, 0, 0, tzinfo=UTC)
@@ -291,6 +293,115 @@ class TestGetFeeds:
         with pytest.raises(ServiceValidationError):
             await _call(hass, SERVICE_GET_FEEDS, {"category": "Nonexistent"})
         fake_client.get_feeds.assert_not_called()
+
+    async def test_unread_joined_from_snapshot_for_feed_present_in_it(
+        self, hass, entry_with_client, fake_client, coordinator, snapshot_factory, make_feed
+    ):
+        feed = make_feed(id=1)
+        coordinator.data = snapshot_factory(feeds=(feed,), unread_by_feed={1: 7})
+        fake_client.get_feeds.return_value = [feed]
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_FEEDS, {})
+
+        assert result["feeds"][0]["unread"] == 7
+
+    async def test_unread_defaults_to_zero_when_feed_absent_from_snapshot(
+        self, hass, entry_with_client, fake_client, coordinator, snapshot_factory, make_feed
+    ):
+        """G2/D-6: never null, never an error -- e.g. a feed created after
+        the last poll, or the snapshot simply not covering it yet."""
+        feed = make_feed(id=1)
+        coordinator.data = snapshot_factory(feeds=(), unread_by_feed={})
+        fake_client.get_feeds.return_value = [feed]
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_FEEDS, {})
+
+        assert result["feeds"][0]["unread"] == 0
+
+    async def test_only_with_errors_still_carries_unread(
+        self, hass, entry_with_client, fake_client, coordinator, snapshot_factory, make_feed
+    ):
+        errored = make_feed(id=2, parsing_error_count=3)
+        coordinator.data = snapshot_factory(feeds=(errored,), unread_by_feed={2: 4})
+        fake_client.get_feeds.return_value = [errored]
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_FEEDS, {"only_with_errors": True})
+
+        assert result["feeds"][0]["unread"] == 4
+
+
+class TestGetCategories:
+    async def test_empty_category_is_included(
+        self, hass, entry_with_client, fake_client, coordinator, snapshot_factory
+    ):
+        """The entire reason G1 exists: a category with zero feeds is
+        invisible to the feed-derived snapshot but must still appear here."""
+        fake_client.get_categories.return_value = [Category(id=100, title="Empty")]
+        coordinator.data = snapshot_factory(feeds=())
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_CATEGORIES, {})
+
+        assert result == {
+            "categories": [{"id": 100, "title": "Empty", "feed_count": None, "unread": None}]
+        }
+
+    async def test_counts_joined_from_snapshot_when_present(
+        self, hass, entry_with_client, fake_client, coordinator, snapshot_factory, make_feed
+    ):
+        feeds = (make_feed(id=1, category_id=100), make_feed(id=2, category_id=100))
+        coordinator.data = snapshot_factory(
+            feeds=feeds, unread_by_category=(CategoryUnread(id=100, title="News", unread=9),)
+        )
+        fake_client.get_categories.return_value = [Category(id=100, title="News")]
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_CATEGORIES, {})
+
+        assert result["categories"] == [
+            {"id": 100, "title": "News", "feed_count": 2, "unread": 9}
+        ]
+
+    async def test_uncategorized_feed_in_snapshot_is_not_counted_toward_any_category(
+        self, hass, entry_with_client, fake_client, coordinator, snapshot_factory, make_feed
+    ):
+        uncategorized = make_feed(id=1, category_id=None, category_title=None)
+        coordinator.data = snapshot_factory(feeds=(uncategorized,))
+        fake_client.get_categories.return_value = [Category(id=100, title="News")]
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_CATEGORIES, {})
+
+        assert result["categories"] == [
+            {"id": 100, "title": "News", "feed_count": None, "unread": None}
+        ]
+
+    async def test_category_absent_from_snapshot_gets_null_counts_not_error(
+        self, hass, entry_with_client, fake_client, coordinator, snapshot_factory
+    ):
+        fake_client.get_categories.return_value = [Category(id=999, title="Brand New")]
+        coordinator.data = snapshot_factory(feeds=())
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_CATEGORIES, {})
+
+        assert result["categories"] == [
+            {"id": 999, "title": "Brand New", "feed_count": None, "unread": None}
+        ]
+
+    async def test_empty_instance_returns_empty_list_and_resolves_with_no_config_entry_id(
+        self, hass, entry_with_client, fake_client
+    ):
+        fake_client.get_categories.return_value = []
+        async_register_services(hass)
+
+        result = await _call(hass, SERVICE_GET_CATEGORIES, {})
+
+        assert result == {"categories": []}
+        fake_client.get_categories.assert_called_once()
 
 
 class TestUpdateEntries:

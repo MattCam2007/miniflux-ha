@@ -82,6 +82,21 @@ class Feed:
 
 
 @dataclass(frozen=True, slots=True)
+class Category:
+    """A Miniflux category, as returned by GET /v1/categories (G1). Unlike
+    ``CategoryUnread`` (rollup.py's feed-derived, non-empty-only projection),
+    this is the authoritative live list -- it is the only way an empty
+    category is ever observable. ``feed_count``/``unread`` are never set
+    here (this module has no snapshot access); the service layer joins them
+    from the poll snapshot where available, ``None`` otherwise (D-7)."""
+
+    id: int
+    title: str
+    feed_count: int | None = None
+    unread: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CategoryUnread:
     """One row of the unread-by-category rollup (architecture §3.2)."""
 

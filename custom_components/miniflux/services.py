@@ -36,6 +36,7 @@ from .const import (
     SERVICE_DELETE_FEED,
     SERVICE_DISCOVER_FEEDS,
     SERVICE_EXPORT_OPML,
+    SERVICE_GET_CATEGORIES,
     SERVICE_GET_ENTRIES,
     SERVICE_GET_FEEDS,
     SERVICE_IMPORT_OPML,
@@ -56,7 +57,7 @@ from .filters import (
     to_query_params,
     validate_entry_ids,
 )
-from .models import Entry, Feed
+from .models import Category, Entry, Feed, Snapshot
 from .timeutil import TimeParseError
 
 # Service-call field names (schema keys) -- distinct from CONF_* (config
@@ -123,6 +124,8 @@ GET_FEEDS_SCHEMA = vol.Schema(
         vol.Optional(FIELD_ONLY_WITH_ERRORS, default=False): cv.boolean,
     }
 )
+
+GET_CATEGORIES_SCHEMA = vol.Schema({vol.Optional(FIELD_CONFIG_ENTRY_ID): cv.string})
 
 FIELD_EVERYTHING = "everything"
 
@@ -342,7 +345,11 @@ def _entry_to_dict(entry: Entry, *, include_content: bool) -> dict[str, Any]:
     return data
 
 
-def _feed_to_dict(feed: Feed) -> dict[str, Any]:
+def _feed_to_dict(feed: Feed, snapshot: Snapshot) -> dict[str, Any]:
+    """unread is joined from the coordinator's polled snapshot, never a live
+    counters fetch (G2, D-6) -- "as of last poll." A feed the snapshot
+    doesn't know about (e.g. created after the last poll) reads 0, never
+    null and never an error."""
     return {
         "id": feed.id,
         "title": feed.title,
@@ -354,6 +361,18 @@ def _feed_to_dict(feed: Feed) -> dict[str, Any]:
         "parsing_error_count": feed.parsing_error_count,
         "parsing_error_message": feed.parsing_error_message,
         "disabled": feed.disabled,
+        "unread": snapshot.unread_by_feed.get(feed.id, 0),
+    }
+
+
+def _category_to_dict(
+    category: Category, *, feed_count: int | None, unread: int | None
+) -> dict[str, Any]:
+    return {
+        "id": category.id,
+        "title": category.title,
+        "feed_count": feed_count,
+        "unread": unread,
     }
 
 
@@ -423,7 +442,39 @@ async def _handle_get_feeds(call: ServiceCall) -> dict[str, Any]:
     if call.data[FIELD_ONLY_WITH_ERRORS]:
         feeds = [f for f in feeds if f.parsing_error_count > 0]
 
-    return {"feeds": [_feed_to_dict(f) for f in feeds]}
+    return {"feeds": [_feed_to_dict(f, coordinator.data) for f in feeds]}
+
+
+async def _handle_get_categories(call: ServiceCall) -> dict[str, Any]:
+    entry = _resolve_entry(call.hass, call.data.get(FIELD_CONFIG_ENTRY_ID))
+    client = entry.runtime_data.client
+    coordinator = entry.runtime_data.coordinator
+
+    categories = await _run(client.get_categories())
+
+    # Both derived from the snapshot's *feeds* (rollup.py): a category
+    # missing from either dict has zero feeds in the snapshot as of the
+    # last poll -- indistinguishable from "the snapshot simply doesn't know
+    # about it yet" (e.g. created after the last poll), so both counts come
+    # back null rather than a possibly-wrong 0 (G1, D-7).
+    feed_count_by_category: dict[int, int] = {}
+    for feed in coordinator.data.feeds:
+        if feed.category_id is not None:
+            feed_count_by_category[feed.category_id] = (
+                feed_count_by_category.get(feed.category_id, 0) + 1
+            )
+    unread_by_category = {cu.id: cu.unread for cu in coordinator.data.unread_by_category}
+
+    return {
+        "categories": [
+            _category_to_dict(
+                category,
+                feed_count=feed_count_by_category.get(category.id),
+                unread=unread_by_category.get(category.id),
+            )
+            for category in categories
+        ]
+    }
 
 
 def _resolve_category_ref(ref: int | str, snapshot) -> int:
@@ -626,6 +677,13 @@ def async_register_services(hass: HomeAssistant) -> None:
         SERVICE_GET_FEEDS,
         _handle_get_feeds,
         schema=GET_FEEDS_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_CATEGORIES,
+        _handle_get_categories,
+        schema=GET_CATEGORIES_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(

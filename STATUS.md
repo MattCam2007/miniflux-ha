@@ -12,7 +12,7 @@ This file is the single place to check "where are we, exactly." If it disagrees 
 - A **Home Assistant custom integration** for a self-hosted **Miniflux** RSS/Atom reader, installed via **HACS as a custom repository**.
 - A **plumbing layer**: it polls Miniflux, verifies and reacts to Miniflux's native webhook, and exposes that as HA-native primitives —
   - **4 entities:** `sensor.miniflux_unread_entries`, `sensor.miniflux_starred_entries`, `sensor.miniflux_feeds_with_errors`, `binary_sensor.miniflux_reachable`.
-  - **17 services:** query (`search_entries`, `count_entries`, `get_entries`, `get_feeds`), mutation (`update_entries`, `mark_all_read`), and admin (feed/category CRUD, `refresh_feed`/`refresh_all_feeds`, `discover_feeds`, `export_opml`/`import_opml`).
+  - **18 services:** query (`search_entries`, `count_entries`, `get_entries`, `get_feeds`, `get_categories`), mutation (`update_entries`, `mark_all_read`), and admin (feed/category CRUD, `refresh_feed`/`refresh_all_feeds`, `discover_feeds`, `export_opml`/`import_opml`).
   - **4 HA event types it can fire:** `miniflux_new_entries`, `miniflux_entry_saved`, `miniflux_feed_error`, `miniflux_feed_recovered` — see the webhook section below, only the first two of these come from Miniflux itself.
   - **2 self-clearing Repair issues** for webhook wiring problems, and a **redacted diagnostics dump** for bug reports.
 - Meant to sit **underneath** a separate orchestration layer (n8n or anything else that can call an HA service) that the user builds themselves. This integration makes zero decisions about what to do with the data.

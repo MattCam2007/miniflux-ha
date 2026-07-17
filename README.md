@@ -62,6 +62,7 @@ Event payloads are compact projections (no article body, capped entry lists) —
 | `miniflux.count_entries` | Cheap pre-flight count with the same filter contract |
 | `miniflux.get_entries` | Hydrate specific entries by id (the event-to-content bridge) |
 | `miniflux.get_feeds` | List feeds, optionally filtered by category or parsing errors |
+| `miniflux.get_categories` | List every category, including empty ones (feed_count/unread as of last poll) |
 | `miniflux.update_entries` | Declarative status/starred update over an explicit id list |
 | `miniflux.mark_all_read` | Mark a whole feed/category/instance as read (the human "inbox zero" action) |
 | `miniflux.create_feed` / `update_feed` / `delete_feed` | Feed management |

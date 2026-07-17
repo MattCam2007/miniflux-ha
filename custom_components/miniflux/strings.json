@@ -188,6 +188,16 @@
         }
       }
     },
+    "get_categories": {
+      "name": "Get categories",
+      "description": "List every category, including ones with no feeds -- the only way to see an empty category (feed_count/unread are 'as of last poll'; null when the poll snapshot has no data for that category yet).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Miniflux instance",
+          "description": "Target a specific Miniflux instance. Required only if more than one is configured."
+        }
+      }
+    },
     "update_entries": {
       "name": "Update entries",
       "description": "Declarative status/starred update over an explicit list of entry ids -- never a scope. At least one of Status/Starred is required.",
@@ -365,7 +375,7 @@
     },
     "delete_category": {
       "name": "Delete category",
-      "description": "Deletes a category. Feeds in it become uncategorized in Miniflux; they are not deleted.",
+      "description": "Deletes a category AND every feed inside it, along with those feeds' entries. Not reversible -- the most destructive single call in this integration.",
       "fields": {
         "config_entry_id": {
           "name": "Miniflux instance",
