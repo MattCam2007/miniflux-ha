@@ -89,17 +89,13 @@ describe("FakeHass + fixture() harness self-test (F-U2)", () => {
     }
   });
 
-  it("non-admin users never receive subscribeEvents callbacks (G4)", async () => {
+  it("non-admin users' subscribeEvents call rejects (G4 -- real HA raises Unauthorized)", async () => {
     const hass = new FakeHass();
     hass.user.is_admin = false;
-    let received = 0;
-    await hass.connection.subscribeEvents(() => {
-      received += 1;
-    }, "miniflux_new_entries");
 
-    hass.fireEvent("miniflux_new_entries", {});
-
-    expect(received).toBe(0);
+    await expect(
+      hass.connection.subscribeEvents(() => {}, "miniflux_new_entries"),
+    ).rejects.toThrow(/Unauthorized/);
   });
 
   it("admin users receive subscribeEvents callbacks for the subscribed type", async () => {
@@ -114,17 +110,5 @@ describe("FakeHass + fixture() harness self-test (F-U2)", () => {
     hass.fireEvent("miniflux_feed_error", {});
 
     expect(received).toBe(1);
-  });
-
-  it("subscribeEntities fires on a simulated poll tick", () => {
-    const hass = new FakeHass();
-    const seen: number[] = [];
-    hass.connection.subscribeEntities((states) => {
-      seen.push(Object.keys(states).length);
-    });
-
-    hass.setState("sensor.miniflux_unread_entries", "3");
-
-    expect(seen).toEqual([1]);
   });
 });

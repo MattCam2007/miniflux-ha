@@ -22,7 +22,6 @@ export interface HassConnection {
     callback: (event: { event_type: string; data: Record<string, unknown> }) => void,
     eventType?: string,
   ): Promise<() => void>;
-  subscribeEntities(callback: (states: Record<string, HassEntityState>) => void): () => void;
 }
 
 export interface Hass {

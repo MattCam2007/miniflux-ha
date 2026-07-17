@@ -49,23 +49,27 @@ interface HassEvent {
 }
 
 type EventCallback = (event: HassEvent) => void;
-type EntitiesCallback = (states: Record<string, HassEntity>) => void;
 
-/** Mirrors the shape of home-assistant-js-websocket's real `Connection`
- * closely enough for card code to use unmodified against either. */
+/** Mirrors the real `Connection.subscribeEvents` (home-assistant-js-
+ * websocket) closely enough for card code to use unmodified against
+ * either. There is deliberately no `subscribeEntities` here: real HA never
+ * exposes that as a `connection` method (it's a heavier standalone helper
+ * wrapping `conn.subscribeMessage` + a diff-collection cache) -- F-U7's
+ * entity-tick signal instead comes from the card's own `hass` setter,
+ * which HA already re-invokes on every entity change for every mounted
+ * card, admin or not. See src/store/refresh-bus.ts. */
 class FakeConnection {
   private eventSubscribers: Array<{ cb: EventCallback; eventType?: string }> = [];
-  private entitySubscribers: EntitiesCallback[] = [];
 
   constructor(private readonly hass: FakeHass) {}
 
   async subscribeEvents(cb: EventCallback, eventType?: string): Promise<() => void> {
     if (!this.hass.user.is_admin) {
-      // Real HA: subscribing to arbitrary custom event types over the
-      // websocket is admin-only (G4) -- non-admin subscribers never
-      // receive anything, which is exactly the constraint F-U7's
-      // entity-tick fallback exists to work around.
-      return () => {};
+      // Real HA (websocket_api/commands.py::handle_subscribe_events):
+      // subscribing to a custom event type not in SUBSCRIBE_ALLOWLIST
+      // raises Unauthorized for a non-admin user (G4) -- the promise
+      // rejects, it never silently subscribes to nothing.
+      throw new FakeServiceError("Unauthorized", "unauthorized");
     }
     const entry = { cb, eventType };
     this.eventSubscribers.push(entry);
@@ -79,18 +83,6 @@ class FakeConnection {
     for (const { cb, eventType: want } of this.eventSubscribers) {
       if (!want || want === eventType) cb({ event_type: eventType, data });
     }
-  }
-
-  subscribeEntities(cb: EntitiesCallback): () => void {
-    this.entitySubscribers.push(cb);
-    return () => {
-      this.entitySubscribers = this.entitySubscribers.filter((s) => s !== cb);
-    };
-  }
-
-  /** Test-only trigger -- simulates an entity-state poll tick. */
-  _tickEntities(states: Record<string, HassEntity>): void {
-    for (const cb of this.entitySubscribers) cb(states);
   }
 }
 
@@ -146,8 +138,11 @@ export class FakeHass {
     this.handlers.set(`ws:${type}`, handler);
   }
 
-  /** Test helper: sets/replaces entity state and fires the entity-tick
-   * subscribers, mirroring a coordinator poll landing. */
+  /** Test helper: sets/replaces entity state. Does NOT itself notify
+   * anything -- in production, HA re-invoking the card's `hass` setter
+   * *is* the notification; tests that exercise the refresh bus call
+   * `store.onHassUpdate(hass)` explicitly after this, exactly as a card's
+   * setter would. */
   setState(entityId: string, state: string, attributes: Record<string, unknown> = {}): void {
     const now = new Date().toISOString();
     this.states[entityId] = {
@@ -157,7 +152,6 @@ export class FakeHass {
       last_changed: now,
       last_updated: now,
     };
-    this.connection._tickEntities(this.states);
   }
 
   fireEvent(eventType: string, data: Record<string, unknown>): void {
