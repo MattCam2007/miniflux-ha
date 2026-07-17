@@ -14,7 +14,7 @@
 // ("service_does_not_support_response"), confirmed against
 // homeassistant/core.py's ServiceRegistry.async_call.
 
-import { resolveConfigEntryId } from "./config-entry";
+import { resolveConfigEntryId, toBackendConfigEntryId } from "./config-entry";
 import { runCall } from "./errors";
 import type { Hass } from "./hass-types";
 import type { CategoryDto, DiscoverCandidateDto, EntryStatus, FeedDto } from "./types";
@@ -35,7 +35,10 @@ export class MinifluxApi {
     data: Record<string, unknown>,
   ): Promise<T> {
     const configEntryId = resolveConfigEntryId(hass, options.config_entry_id);
-    const payload = omitUndefined({ ...data, config_entry_id: configEntryId });
+    const payload = omitUndefined({
+      ...data,
+      config_entry_id: toBackendConfigEntryId(configEntryId),
+    });
     const { response } = await runCall(
       hass.callService("miniflux", service, payload, undefined, true, true),
     );
@@ -49,7 +52,10 @@ export class MinifluxApi {
     data: Record<string, unknown>,
   ): Promise<void> {
     const configEntryId = resolveConfigEntryId(hass, options.config_entry_id);
-    const payload = omitUndefined({ ...data, config_entry_id: configEntryId });
+    const payload = omitUndefined({
+      ...data,
+      config_entry_id: toBackendConfigEntryId(configEntryId),
+    });
     await runCall(hass.callService("miniflux", service, payload, undefined, true, false));
   }
 

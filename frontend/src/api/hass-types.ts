@@ -13,7 +13,11 @@ export interface HassEntityState {
 export interface HassEntityRegistryEntry {
   entity_id: string;
   platform: string;
-  config_entry_id: string | null;
+  // Real HA's `hass.entities` is the *display* registry
+  // (EntityRegistryDisplayEntry), which does NOT include config_entry_id --
+  // it's optional/absent here for that reason. config-entry.ts detects the
+  // integration via `platform` and never depends on this being present.
+  config_entry_id?: string | null;
   device_id?: string | null;
 }
 
