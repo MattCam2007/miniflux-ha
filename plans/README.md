@@ -18,3 +18,5 @@ TDD build plan for the Miniflux Home Assistant integration, derived from [`../do
 Each chunk (e.g. `P1.4`) is an individually testable red→green→refactor unit with its tests listed first. Build sequentially; deviate only on a real blocker (overview §7).
 
 **Build-time reference:** [`r1-contract-pinning.md`](./r1-contract-pinning.md) — copy-paste commands to capture your live Miniflux instance's exact wire shapes (headers, payloads, signature scheme) into `tests/fixtures/`. Run it before freezing Phase 2; it closes risk R1.
+
+**Next up:** [`cards/`](./cards/README.md) — high-level plans for the Lovelace dashboard card suite (9 cards) that exercises every entity, service, parameter, and event of the shipped integration. Doubles as the live stress-test plan.
