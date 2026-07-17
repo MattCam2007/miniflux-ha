@@ -102,6 +102,17 @@ def test_manifest_has_codeowners():
     assert all(owner.startswith("@") for owner in manifest["codeowners"])
 
 
+def test_manifest_keys_are_sorted_domain_name_then_alphabetical():
+    """hassfest's own manifest-key-order rule: `domain`, `name`, then every
+    other key alphabetically. json.loads preserves file order (Python 3.7+
+    dicts), so this reads the *actual* on-disk key order, not a re-sorted
+    copy -- a key added out of place fails this the same way hassfest would."""
+    keys = list(_load(MANIFEST_PATH).keys())
+    assert keys[0] == "domain"
+    assert keys[1] == "name"
+    assert keys[2:] == sorted(keys[2:])
+
+
 def test_hacs_json_is_valid():
     hacs = _load(HACS_PATH)
     assert isinstance(hacs, dict)
