@@ -4,3 +4,5 @@
 import "./spike-card";
 import "./cards/feed-manager-card";
 import "./cards/feed-manager-card-editor";
+import "./cards/category-manager-card";
+import "./cards/category-manager-card-editor";
