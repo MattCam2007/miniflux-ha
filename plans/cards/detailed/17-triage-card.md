@@ -1,5 +1,7 @@
 # C7 — Triage Card — Units & Usage
 
+> **🟡 PHASE 2 — DEFERRED.** Depends on the deferred RC pipeline. Not part of minimum-bar Phase 1 (decision **D‑1**, [`00-START-HERE.md`](./00-START-HERE.md)). Do not build during Phase 1.
+
 **High-level source:** [`../08-triage-card.md`](../08-triage-card.md). The fast-interaction card — one entry at a time, inbox-zero flow, keyboard/touch driven. Where C2 is for *reading*, C7 is for *deciding*.
 **Depends on:** F (all), RC pipeline (`RC-U11` content, `RC-U6` media), shares atoms with C2. The sustained-small-writes stress profile.
 

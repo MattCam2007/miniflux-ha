@@ -1,5 +1,7 @@
 # C1 — Status Card — Units & Usage
 
+> **🟡 PHASE 2 — DEFERRED.** Not part of the minimum-bar Phase 1 (C3/C4 only, decision **D‑1** in [`00-START-HERE.md`](./00-START-HERE.md)). Do not build during Phase 1.
+
 **High-level source:** [`../02-status-card.md`](../02-status-card.md). First real proof of the plumbing: entity binding, service quick-actions, confirm dialog.
 **Depends on:** F (all), `<mf-confirm>` (F-U9), truncation notice (F-U11).
 

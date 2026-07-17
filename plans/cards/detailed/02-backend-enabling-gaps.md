@@ -1,5 +1,7 @@
 # Backend Enabling Gaps — `G1`–`G8` as TDD units
 
+> **Phase split (locked, `00-START-HERE.md`):** **`G2` and `G1` are PHASE 1** — build them now, they are prerequisites for C3 and C4 (`G1` is a hard requirement for C4). Their shapes are locked by **D‑6** (`G2`) and **D‑7** (`G1`) — build to those, not to any looser wording below. **`G3`, `G5`, `G6`, `G7`, `G8` are PHASE 2 (DEFERRED)** — do not build them during Phase 1. `G4` is a documented constraint, not a unit.
+
 These are **integration-code** changes, built with the repo's existing pytest TDD process before the card/pipeline unit that needs them. `G1`–`G4` were surfaced in [`../00-overview.md §6`](../00-overview.md); `G5`–`G8` are surfaced by the *rich-content* goal — the integration currently drops the fields that make RSS content rich.
 
 Ground truth (verified in code):
@@ -82,17 +84,19 @@ Seam rule for all of these: Miniflux JSON field names stay confined to `api.py` 
 
 ## Previously-identified enablers (build before their card)
 
-### `G1` — `get_categories` service — **hard prerequisite for C4**
+### `G1` — `get_categories` service — **PHASE 1, hard prerequisite for C4**
 **Why:** empty categories are invisible today (only observable via feeds). Backend already hits `/v1/categories` at poll time.
-**Changes:** `api.py::get_categories() -> list[Category]`; `models.py::Category`; new service `get_categories` → `{categories:[{id,title,feed_count,unread}]}` (feed_count/unread joined from the coordinator snapshot where possible, else `/v1/categories?counts=true`).
-**Tests:** category with zero feeds present; counts joined; unknown-count → `null` not error; service returns list; multi-instance targeting.
-**DoD:** C4 can render an empty category; coverage holds.
+**Locked (D‑7):** new service `get_categories` → `{categories:[{id, title, feed_count, unread}]}`. `feed_count`/`unread` are **joined from the coordinator snapshot** where available; unknown → **`null`** (never an error). The list **must include categories with zero feeds** — that is the entire reason `G1` exists.
+**Changes:** `api.py::get_categories() -> list[Category]` (GET `/v1/categories`, optionally `?counts=true`); `models.py::Category(id, title, feed_count: int|None, unread: int|None)`; `normalize.py` maps it; new `get_categories` service handler joins snapshot counts and serializes. Miniflux JSON field names stay in `api.py`/`normalize.py`.
+**Tests:** category with zero feeds present in the result; counts joined from snapshot; a category the snapshot lacks counts for → `feed_count/unread: null`, not an error; empty instance → `{categories: []}`; single-instance targeting resolves with no `config_entry_id`.
+**DoD:** C4 can render an empty category; coverage floors hold.
 
-### `G2` — per-feed unread counts in `get_feeds` — **precedes C3**
+### `G2` — per-feed unread counts in `get_feeds` — **PHASE 1, precedes C3**
 **Why:** C3 wants an unread badge per feed without N× `count_entries`. The coordinator already fetches `/v1/feeds/counters` each poll; the data exists in the snapshot.
-**Changes:** `_feed_to_dict` adds `unread` (and `read`?) sourced from the snapshot's `unread_by_feed`. Note: `get_feeds` is a *live* fetch (`architecture.md §3.3`) while counters live in the snapshot — resolve whether `get_feeds` reads counters live or joins the snapshot (Q5).
-**Tests:** feed with counters → `unread` present; feed absent from counters → `unread: 0` or `null` per Q5; only_with_errors still works.
-**DoD:** Q5 resolved; C3 badge has a source; coverage holds.
+**Locked (D‑6):** `get_feeds` **joins the coordinator's polled snapshot** (`unread_by_feed`) — it does **not** issue a live counters fetch. The count is "as of last poll." A feed absent from the snapshot → **`unread: 0`** (never `null`, never an error).
+**Changes:** `_feed_to_dict` adds `unread: int` from `snapshot.unread_by_feed.get(feed.id, 0)`. Thread the snapshot into the `get_feeds` service handler (it already has coordinator access). No `api.py`/`normalize.py` change (the field is derived, not from feed JSON).
+**Tests:** feed present in `unread_by_feed` → that count; feed absent → `unread: 0`; `only_with_errors` still works and still carries `unread`; a feed the snapshot has but the live `get_feeds` doesn't (deleted between poll and call) simply isn't in the result.
+**DoD:** C3 badge has a source; coverage floors hold.
 
 ### `G3` — `search_entries` offset — **optional, improves C2/C6**
 **Why:** true pagination; removes the equal-timestamp cursor dedup wart (`../00-overview.md §3`). Miniflux supports `offset` natively.

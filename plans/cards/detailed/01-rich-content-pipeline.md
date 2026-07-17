@@ -1,5 +1,7 @@
 # Rich Content Pipeline — Units RC-U1 … RC-U12
 
+> **🟡 PHASE 2 — DEFERRED. Do not build during Phase 1.** Per the locked decision **D‑1** ([`00-START-HERE.md`](./00-START-HERE.md)), the minimum-bar management cards (C3/C4) ship first. This pipeline, its cards (C2/C7), and its enablers (`G5`/`G6`/`G7`) are out of scope until Phase 1 is validated and released. The content-rendering decisions below (sanitizer, images, embeds, readability) are **not yet final** — they get hashed with the maintainer when Phase 2 starts.
+
 **This is the centerpiece of the "rich RSS content" goal.** Everything else in the suite is plumbing and management; this is the part that turns a Miniflux entry into something worth looking at on a dashboard. It is built as a set of shared components (living in the foundation bundle) that C2 (reader) and C7 (triage) compose, and that C6 (search) reuses for row expansion.
 
 **Depends on backend enablers** `G5` (enclosures), `G6` (feed icons), `G7` (readability) — see [`02-backend-enabling-gaps.md`](./02-backend-enabling-gaps.md). RC-U1…U4 need none of them and can start immediately after `F-U1/F-U2`.

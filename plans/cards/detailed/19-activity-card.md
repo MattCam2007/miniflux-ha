@@ -1,5 +1,7 @@
 # C9 — Activity Card — Units & Usage
 
+> **🟡 PHASE 2 — DEFERRED.** Not part of minimum-bar Phase 1 (decision **D‑1**, [`00-START-HERE.md`](./00-START-HERE.md)). Do not build during Phase 1.
+
 **High-level source:** [`../10-activity-card.md`](../10-activity-card.md). The stress-test observer — a live, readable tail of everything the integration emits. Pure listener: **no service calls**, so it never adds load to what it observes.
 **Depends on:** F (all), especially the refresh bus subscriptions (F-U7).
 

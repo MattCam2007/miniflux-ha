@@ -1,5 +1,7 @@
 # C2 — Reader Card — Units & Usage
 
+> **🟡 PHASE 2 — DEFERRED.** The rich reading surface. Not part of minimum-bar Phase 1 (decision **D‑1**, [`00-START-HERE.md`](./00-START-HERE.md)); depends on the deferred RC pipeline and `G5/G6/G7`. Do not build during Phase 1.
+
 **High-level source:** [`../03-reader-card.md`](../03-reader-card.md). **The flagship** and the primary *rich RSS content* surface — a small RSS reader inside a dashboard tile.
 **Depends on:** F (all), the entire **RC pipeline** (`RC-U1…U12`), and its backend enablers `G5/G6/G7`. Benefits from `G3` (offset) but ships with cursor pagination without it.
 

@@ -1,4 +1,6 @@
-# Questions, Issues & Concerns — resolve before implementation
+# Questions, Issues & Concerns
+
+> **STATUS: Phase 1 decisions LOCKED.** The blocking items needed to start the minimum-bar phase are resolved — see [`00-START-HERE.md §1`](./00-START-HERE.md) for the authoritative locked list (D‑1…D‑9) and the resolution map in §F below. Items marked **[DEFERRED-P2]** are genuinely not-yet-decided and belong to the Phase 2 (rich-content) pickup; they do **not** block Phase 1.
 
 **Purpose:** the gating list. Nothing in the detailed plans should be built until the **Blocking** items here are decided, and each decision should be written back into the referenced plan doc. Items are tagged **[BLOCK]** (decide first), **[SCOPE]** (affects how much we build / release sequencing), or **[TUNE]** (safe to defer, has a sane default).
 
@@ -125,20 +127,33 @@ The plans carry per-instance cache/event isolation throughout. If the user only 
 
 ---
 
-## F. Resolution checklist
+## F. Resolution map
 
-Before implementation starts, this table should be all-✅:
-
-| ID | Decision needed | Owner | Status |
+| ID | Decision | Resolution | Locked as |
 |---|---|---|---|
-| S1 | Rich content in 0.1 vs 0.2 fast-follow | user | ☐ |
-| S3 | Real-HA smoke test + CI green first | user | ☐ |
-| S4 | Rich-content MVP vs full suite vs minimum-bar-first | user | ☐ |
-| Q1 | Sanitizer = DOMPurify vendored | user/eng | ☐ |
-| Q2 | Embeds: strip+link-out first | user | ☐ |
-| Q3 | Image/icon delivery + privacy stance | user/eng | ☐ |
-| Q7 | Frontend coverage floors | eng | ☐ |
-| Q8 | JS build toolchain spike proves out | eng | ☐ |
-| Q9 | In-repo cards vs companion repo | user/eng | ☐ |
+| S1 | Rich content in 0.1 vs 0.2 | Minimum bar (C3/C4) ships first; rich content is a later phase | **D‑1** |
+| S3 | Real-HA validation timing | Validate integration + first cards together in real HA before any release | **D‑2** |
+| S4 | MVP vs full vs minimum-bar-first | **Minimum bar first** (C3 feed + C4 category mgmt) | **D‑1** |
+| Q5 (G2) | Per-feed unread source | Join the poll snapshot; `unread:0` when absent | **D‑6** |
+| G1 | `get_categories` shape | `{id,title,feed_count,unread}`, empty categories included | **D‑7** |
+| Q7 | Coverage floors | 100% shared runtime + backend; 90% card views | **D‑8** |
+| Q8 | JS toolchain risk | Prove via `F‑U1` spike end-to-end first | **D‑9** |
+| Q9 | In-repo vs companion repo | In-repo, frontend as an isolated `frontend/` subtree | **D‑5** |
+| Q14 | Destructive friction | Feed delete = confirm; category delete = hold-to-confirm | **D‑4** |
+| Q15 | Multi-instance | Single instance; keep seam, skip multi-instance UX + `S7` | **D‑3** |
 
-Everything tagged **[TUNE]** can proceed with the recommended default and be revisited during implementation.
+**Deferred to Phase 2 (rich-content pickup) — not blocking Phase 1:**
+
+| ID | Open decision | Tag |
+|---|---|---|
+| Q1 | Sanitizer = DOMPurify vendored (recommended) vs hand-rolled | **[DEFERRED-P2]** |
+| Q2 | Embeds: strip+link-out (recommended) vs allowlisted click-to-load | **[DEFERRED-P2]** |
+| Q3 | Content-image delivery + privacy (icons forced through integration) | **[DEFERRED-P2]** |
+| Q4 | `fetch_original` on `get_entries` only (recommended) | **[DEFERRED-P2]** |
+| Q6 | Podcast position local-only vs write-back | **[DEFERRED-P2]** |
+| Q10 | Bundle size budget / deps | **[DEFERRED-P2]** |
+| Q11 | Card-string i18n | **[DEFERRED-P2]** |
+| Q12 | `show_images`/`show_media` defaults | **[DEFERRED-P2]** |
+| Q13 | `auto_mark_read_on_expand` default | **[DEFERRED-P2]** |
+
+These get hashed with the maintainer when Phase 2 starts. Everything tagged **[TUNE]** above proceeds with its recommended default.

@@ -1,7 +1,9 @@
 # C4 — Category Manager Card — Units & Usage
 
+> **🟢 PHASE 1 — BUILD NOW.** The second minimum-bar card ([`00-START-HERE.md`](./00-START-HERE.md), decision **D‑1**). **Baked decisions:** `require_hold` default **true** (category delete cascades → hold-to-confirm, **D‑4**); category list + counts from **`G1`** with empty categories included (**D‑7**); single instance, zero-config (**D‑3**). **`G1` is a hard prerequisite — build it (step 4) before this card.**
+
 **High-level source:** [`../05-category-manager-card.md`](../05-category-manager-card.md). The second half of the minimum bar — every operation on a category.
-**Depends on:** F (all), `<mf-confirm>` (F-U9); **`G1` (`get_categories`) is a hard prerequisite** — without it, empty categories are invisible and the card cannot honestly claim "see all categories."
+**Depends on:** F (foundation atoms C4 uses), `<mf-confirm>` incl. the hold variant (F-U9), the category picker (F-U10); **`G1` (`get_categories`) is a hard prerequisite** — without it, empty categories are invisible and the card cannot honestly claim "see all categories."
 
 ---
 

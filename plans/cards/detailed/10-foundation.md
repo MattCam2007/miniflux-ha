@@ -1,5 +1,7 @@
 # F — Foundation — Units F-U1 … F-U14
 
+> **🟢 PHASE 1 — BUILD NOW, but LAZILY.** Build only the foundation units C3/C4 actually consume, in the order given by [`00-START-HERE.md §2`](./00-START-HERE.md). **Baked decisions:** **D‑5** frontend lives in an isolated `frontend/` subtree; **D‑9** `F‑U1` is a prove-it-in-real-HA spike done first; **D‑3** single instance — keep the `config_entry_id` cache seam but **skip all multi-instance UX and the `S7` test matrix** (`F-U3` always auto-resolves the sole entry; `F-U13` editor always hides the entry picker); **D‑8** coverage floors (100% runtime, 90% views). The single HA user is typically **non-admin**, so in `F-U7` the entity-tick refresh path is the primary signal to build and test — the admin custom-event path is a bonus, not the baseline (`G4`).
+
 **High-level source:** [`../01-foundation.md`](../01-foundation.md). Everything C1–C9 and the RC pipeline depend on. No user-visible card; the one integration-code change here is static-path + Lovelace-resource registration.
 
 Baselines from [`00-method-and-conventions.md`](./00-method-and-conventions.md) apply throughout.

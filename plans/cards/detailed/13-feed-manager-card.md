@@ -1,16 +1,18 @@
 # C3 — Feed Manager Card — Units & Usage
 
+> **🟢 PHASE 1 — BUILD NOW.** One of the two minimum-bar cards ([`00-START-HERE.md`](./00-START-HERE.md), decision **D‑1**). **Baked decisions:** `require_hold` default **false** (feed delete = confirm dialog only, **D‑4**); unread badge sourced from **`G2`** snapshot join (**D‑6**); **no feed favicons** in Phase 1 (`G6` deferred) — use a letter/monogram avatar; single instance, zero-config (**D‑3**).
+
 **High-level source:** [`../04-feed-manager-card.md`](../04-feed-manager-card.md). The "see and do **all** operations on a feed" card — the minimum-bar requirement. Covers 9 of 17 services.
-**Depends on:** F (all), `<mf-confirm>` (F-U9), pickers (F-U10), feed badge (RC-U7); **`G2`** (per-feed unread counts) should land first; benefits from `G6` (icons).
+**Depends on:** F (foundation atoms C3 uses), `<mf-confirm>` (F-U9), pickers (F-U10); **`G2`** (per-feed unread counts) lands first. Feed icons (`G6`/RC-U7) are **Phase 2** — Phase 1 uses a monogram avatar.
 
 ---
 
 ## Units
 
 ### `C3-U1` — Feed list, grouping, feed rows
-**Depends on:** F-U13, F-U6, RC-U7
-**Behavior:** `get_feeds` list, `group_by: category|none`, rows show feed icon + title, unread badge (`G2`, fallback `count_entries`), disabled ⏸ / error ⚠ state, `checked_at` age; "Uncategorized" group for feeds without a category.
-**Tests:** grouped render; uncategorized group present; disabled/error styles; unread badge from `G2` (fallback path when absent); age from `checked_at`.
+**Depends on:** F-U13, F-U6 (**not** RC-U7 — no icons in Phase 1)
+**Behavior:** `get_feeds` list, `group_by: category|none`, rows show a **monogram/letter avatar** + title (real favicons are Phase 2, `G6`), unread badge from **`G2`** (snapshot join, "as of last poll"), disabled ⏸ / error ⚠ state, `checked_at` age; "Uncategorized" group for feeds without a category.
+**Tests:** grouped render; uncategorized group present; disabled/error styles; unread badge from `G2` (`unread:0` when a feed has no snapshot count); monogram avatar rendered; age from `checked_at`.
 
 ### `C3-U2` — Add-feed wizard (discover → create)
 **Depends on:** C3-U1, F-U10
@@ -44,9 +46,9 @@ group_by: category         # category | none
 category: Tech             # optional hard scope
 show_add: true             # add-feed wizard
 show_delete: true          # false → hide destructive ops (display-only dashboards)
-require_hold: false        # hold-to-confirm on delete
-show_feed_icons: true      # feed favicons (G6)
+require_hold: false        # hold-to-confirm on delete (default off — D-4)
 height: 520px
+# show_feed_icons:         # Phase 2 (needs G6); Phase 1 uses monogram avatars
 ```
 
 | Option | Type | Default | Notes |
@@ -55,8 +57,8 @@ height: 520px
 | `category` | string/int | — | Hard scope to one category |
 | `show_add` | bool | `true` | Add-feed wizard button |
 | `show_delete` | bool | `true` | Hide all destructive ops when false |
-| `require_hold` | bool | `false` | Hold-to-confirm on delete |
-| `show_feed_icons` | bool | `true` | Needs `G6` |
+| `require_hold` | bool | `false` | Hold-to-confirm on delete (off by default — **D‑4**) |
+| `show_feed_icons` | bool | — | **Phase 2** (needs `G6`); Phase 1 shows monogram avatars |
 | `height` | string | `520px` | Scroll-area height |
 
 **Operations** (all reachable per feed): **create** (via discovery wizard), **read** (all feed fields in the detail sheet), **update** (title, category/move, feed URL, disabled, crawler), **delete** (two-step confirm with a real entry count), **refresh**, **mark all read**, **enable/disable**.

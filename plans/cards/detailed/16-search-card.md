@@ -1,5 +1,7 @@
 # C6 — Search Card — Units & Usage
 
+> **🟡 PHASE 2 — DEFERRED.** Not part of minimum-bar Phase 1 (decision **D‑1**, [`00-START-HERE.md`](./00-START-HERE.md)). Do not build during Phase 1.
+
 **High-level source:** [`../07-search-card.md`](../07-search-card.md). The parameter-sweep card (`S6`): every field `search_entries`/`count_entries` accept is a visible, combinable control. If a filter parameter has a bug, this card finds it.
 **Depends on:** F (all), pickers (F-U10), RC pipeline for row expansion (RC-U11/U12). Benefits from `G3` (offset).
 

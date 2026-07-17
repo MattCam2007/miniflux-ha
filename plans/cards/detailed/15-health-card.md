@@ -1,5 +1,7 @@
 # C5 — Health Card — Units & Usage
 
+> **🟡 PHASE 2 — DEFERRED.** Not part of minimum-bar Phase 1 (decision **D‑1**, [`00-START-HERE.md`](./00-START-HERE.md)). Do not build during Phase 1.
+
 **High-level source:** [`../06-health-card.md`](../06-health-card.md). Makes the integration's observability story visible — broken feeds, reachability, and the two poll-derived events (`miniflux_feed_error`/`miniflux_feed_recovered`) nothing else displays as first-class content.
 **Depends on:** F (all); feed badge (RC-U7) optional.
 

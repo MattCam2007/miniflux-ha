@@ -1,5 +1,7 @@
 # C8 — OPML Card — Units & Usage
 
+> **🟡 PHASE 2 — DEFERRED.** Not part of minimum-bar Phase 1 (decision **D‑1**, [`00-START-HERE.md`](./00-START-HERE.md)). Do not build during Phase 1.
+
 **High-level source:** [`../09-opml-card.md`](../09-opml-card.md). Backup and restore — export before you experiment. Drives the last two never-UI-exercised services and the largest request/response strings in the suite.
 **Depends on:** F (all), `<mf-confirm>` (F-U9).
 
