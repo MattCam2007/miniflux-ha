@@ -37,6 +37,16 @@ export async function fixture<E extends LitElement, C = unknown>(
   return el as unknown as E;
 }
 
+/** Waits out any in-flight microtask chain (e.g. a component's `willUpdate`
+ * kicking off an unawaited async load) plus the Lit re-render it causes.
+ * Prefer awaiting a specific promise when a component exposes one; this is
+ * for the common case where it deliberately doesn't (fire-and-forget from
+ * a property setter). */
+export async function flushAsync(el?: LitElement): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  if (el) await el.updateComplete;
+}
+
 export function cleanupFixtures(): void {
   for (const el of mounted.splice(0)) {
     el.remove();
