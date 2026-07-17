@@ -16,6 +16,8 @@ Run from this directory (`frontend/`):
 | `npm run build` | esbuild-bundle `src/index.ts` → `../custom_components/miniflux/frontend/miniflux-cards.js` |
 | `npm run check-bundle-fresh` | CI guard: fails if the committed bundle doesn't byte-match a fresh build |
 | `npm test` | Run the Vitest suite (`happy-dom` environment) |
+| `npm run coverage` | Run the suite with coverage instrumentation |
+| `npm run check-coverage-floors` | CI guard: enforces D-8's per-file coverage floors (100% runtime, 90% card views) |
 | `npm run typecheck` | `tsc --noEmit` |
 
 **After any change under `src/`, run `npm run build` and commit the regenerated bundle.** CI enforces this (`check-bundle-fresh`) — a stale bundle fails the build.

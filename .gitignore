@@ -222,3 +222,4 @@ __marimo__/
 # custom_components/miniflux/frontend/miniflux-cards.js bundle IS committed.
 frontend/node_modules/
 frontend/*.tsbuildinfo
+frontend/coverage/

@@ -8,6 +8,8 @@
     "build": "node scripts/build.mjs",
     "check-bundle-fresh": "node scripts/check-bundle-fresh.mjs",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "check-coverage-floors": "node scripts/check-coverage-floors.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "esbuild": "^0.28.1",
     "happy-dom": "^20.10.6",
     "typescript": "^7.0.2",

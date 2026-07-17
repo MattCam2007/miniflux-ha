@@ -49,5 +49,6 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run coverage
+      - run: npm run check-coverage-floors
       - run: npm run check-bundle-fresh
