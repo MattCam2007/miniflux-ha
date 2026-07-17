@@ -19,3 +19,7 @@ High-level plans for a suite of Lovelace dashboard cards for the Miniflux integr
 | C9 | [`10-activity-card.md`](./10-activity-card.md) | `miniflux-activity-card` | Live tail of the 4 `miniflux_*` events — the stress-test observer |
 
 These are **high-level plans**: each fixes the card's purpose, the exact integration surface it consumes, its layout, interactions, configuration, edge cases, and acceptance criteria. Per-card TDD chunking (in the style of [`../00-overview.md`](../00-overview.md)) is deliberately deferred until a card is picked up for implementation.
+
+## Detailed, implementation-ready plans → [`detailed/`](./detailed/)
+
+The **[`detailed/`](./detailed/)** folder is that deferred pickup. It breaks every card and shared component into **individual, testable units of work** (with per-unit test lists and Definitions of Done), carries **usage documentation** for each card, elevates the **rich-content rendering pipeline** as a first-class concern, and specifies the **backend enabling gaps** (`G1`–`G8`) that truly rich RSS content requires. Start at [`detailed/README.md`](./detailed/README.md), and resolve [`detailed/QUESTIONS-ISSUES-CONCERNS.md`](./detailed/QUESTIONS-ISSUES-CONCERNS.md) before implementation.
