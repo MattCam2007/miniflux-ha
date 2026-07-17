@@ -37,6 +37,22 @@ describe("MinifluxApi", () => {
     await expect(api.getFeeds(unconfigured)).rejects.toBeInstanceOf(NoInstanceConfiguredError);
   });
 
+  it("omits config_entry_id when the instance is only visible via the display registry (real HA), so the backend auto-resolves it", async () => {
+    // Real HA's hass.entities carries `platform` but no config_entry_id.
+    const displayOnly = new FakeHass();
+    displayOnly.entities["sensor.miniflux_unread_entries"] = {
+      entity_id: "sensor.miniflux_unread_entries",
+      platform: "miniflux",
+      config_entry_id: null,
+    };
+    displayOnly.respondTo("miniflux", "get_feeds", () => ({ feeds: [] }));
+
+    await api.getFeeds(displayOnly);
+
+    expect(displayOnly.calls[0].data).not.toHaveProperty("config_entry_id");
+    expect(displayOnly.calls[0].data).toEqual({});
+  });
+
   describe("getFeeds", () => {
     it("builds the correct payload and parses the typed response", async () => {
       hass.respondTo("miniflux", "get_feeds", (data) => {

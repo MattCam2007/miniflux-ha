@@ -79,7 +79,7 @@ The integration ships two Lovelace cards, auto-registered on setup (no manual re
 
 | Card | Type | Does |
 |---|---|---|
-| Feed Manager | `custom:miniflux-feed-manager-card` | Full feed CRUD: add via discovery, edit, delete, refresh, mark-read, enable/disable |
+| [Feed Manager](docs/cards/feed-manager-card.md) | `custom:miniflux-feed-manager-card` | Full feed CRUD: add via discovery, edit, delete, refresh, mark-read, enable/disable |
 | Category Manager | `custom:miniflux-category-manager-card` | Full category CRUD including empty categories, cascade-aware delete, mark-read |
 
 Both are zero-config (single-instance auto-detected) and management surfaces only — no entry/article content is rendered by either card. Frontend source lives in the isolated [`frontend/`](frontend/) subtree; see [`frontend/README.md`](frontend/README.md) for its own build/test commands.
