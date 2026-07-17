@@ -57,7 +57,8 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
     # dependency checks unless declared, and it need not be a hard dependency
     # -- a dashboard-less HA install (rare, but possible) just skips this.
     try:
-        from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_STORAGE
+        from homeassistant.components.lovelace.const import LOVELACE_DATA
+        from homeassistant.components.lovelace.resources import ResourceStorageCollection
     except ImportError:
         _LOGGER.debug("Lovelace component not available; skipping resource registration")
         return
@@ -67,7 +68,13 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
         _LOGGER.debug("Lovelace not set up yet; skipping resource auto-registration")
         return
 
-    if lovelace_data.resource_mode != MODE_STORAGE:
+    # Only a storage-backed resource collection can be edited programmatically;
+    # in YAML mode `resources` is a read-only ResourceYAMLCollection. We key off
+    # the collection type rather than the mode field because that field has been
+    # renamed across HA releases (`mode` -> `resource_mode`), whereas the
+    # collection classes have stayed put.
+    resources = lovelace_data.resources
+    if not isinstance(resources, ResourceStorageCollection):
         _LOGGER.info(
             "Lovelace is running in YAML mode; add the Miniflux card bundle "
             "resource manually -- see docs/setup.md"
@@ -77,7 +84,6 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
     integration = await async_get_integration(hass, DOMAIN)
     resource_url = f"{RESOURCE_URL_PATH}?v={integration.version}"
 
-    resources = lovelace_data.resources
     await resources.async_get_info()  # ensures resources.loaded, no-op if already loaded
 
     existing = next(
