@@ -8,7 +8,7 @@ finds a field-name mismatch, this module is where it gets fixed.
 from __future__ import annotations
 
 from . import timeutil
-from .models import Entry, Feed
+from .models import Category, Entry, Feed
 
 
 def entry_from_json(data: dict) -> Entry:
@@ -50,3 +50,9 @@ def feed_from_json(data: dict) -> Feed:
         parsing_error_message=data.get("parsing_error_message", ""),
         disabled=data.get("disabled", False),
     )
+
+
+def category_from_json(data: dict) -> Category:
+    """feed_count/unread are always None here (G1, D-7) -- this call carries
+    no snapshot to join against; the service layer fills them in."""
+    return Category(id=data["id"], title=data["title"])

@@ -33,3 +33,22 @@ jobs:
           --cov-report=json
           --cov-report=term-missing
       - run: python scripts/check_coverage_floors.py
+
+  frontend:
+    name: Frontend (build, test, bundle freshness)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run coverage
+      - run: npm run check-coverage-floors
+      - run: npm run check-bundle-fresh

@@ -34,6 +34,7 @@ SERVICE_SEARCH_ENTRIES = "search_entries"
 SERVICE_COUNT_ENTRIES = "count_entries"
 SERVICE_GET_ENTRIES = "get_entries"
 SERVICE_GET_FEEDS = "get_feeds"
+SERVICE_GET_CATEGORIES = "get_categories"
 SERVICE_UPDATE_ENTRIES = "update_entries"
 SERVICE_MARK_ALL_READ = "mark_all_read"
 SERVICE_CREATE_FEED = "create_feed"
@@ -128,3 +129,10 @@ ENTRY_STATUSES = (ENTRY_STATUS_UNREAD, ENTRY_STATUS_READ, ENTRY_STATUS_REMOVED)
 # content-level ones (broken feeds are the error sensor + events, not a repair).
 ISSUE_WEBHOOK_SECRET_MISSING = "webhook_secret_missing"
 ISSUE_WEBHOOK_SIGNATURE_FAILING = "webhook_signature_failing"
+
+# --- Frontend card bundle delivery (F-U1, D-5/D-9) --------------------------------
+# The built bundle lives at custom_components/miniflux/frontend/<filename> and is
+# served at FRONTEND_URL_BASE/<filename>; frontend.py registers both the static
+# path and (storage-mode dashboards) the Lovelace resource.
+FRONTEND_URL_BASE = "/miniflux/frontend"
+FRONTEND_BUNDLE_FILENAME = "miniflux-cards.js"

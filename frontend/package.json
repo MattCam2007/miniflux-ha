@@ -1,0 +1,26 @@
+{
+  "name": "miniflux-ha-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lovelace card bundle for the Miniflux Home Assistant integration (isolated frontend subtree, D-5).",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check-bundle-fresh": "node scripts/check-bundle-fresh.mjs",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "check-coverage-floors": "node scripts/check-coverage-floors.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "esbuild": "^0.28.1",
+    "happy-dom": "^20.10.6",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

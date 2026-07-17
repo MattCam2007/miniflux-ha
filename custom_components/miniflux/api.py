@@ -32,7 +32,7 @@ from .const import (
     API_VERSION_PATH_ROOT,
     API_VERSION_PATH_V1,
 )
-from .models import Entry, Feed
+from .models import Category, Entry, Feed
 from .rollup import CountersRaw
 
 # Miniflux's own practical per-request page size. query_entries walks pages
@@ -332,8 +332,16 @@ class MinifluxClient:
 
     # --- Category admin. ---
 
-    async def get_categories(self) -> list[dict[str, Any]]:
-        return await self._request("GET", API_PATH_CATEGORIES)
+    async def get_categories(self) -> list[Category]:
+        """Live GET /v1/categories (G1) -- deliberately plain, no
+        ``?counts=true``: D-7 locks feed_count/unread as a poll-snapshot
+        join done by the service layer, not a second live counters fetch
+        (matching G2's decision), so nothing here ever asks Miniflux for
+        counts. This is the only call in the client that can observe a
+        category with zero feeds -- the coordinator's snapshot cannot
+        (rollup.py derives categories entirely from feeds)."""
+        data = await self._request("GET", API_PATH_CATEGORIES)
+        return [normalize.category_from_json(item) for item in data]
 
     async def create_category(self, title: str) -> int:
         data = await self._request("POST", API_PATH_CATEGORIES, json={"title": title})

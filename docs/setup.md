@@ -30,6 +30,22 @@ This guide wires a self-hosted [Miniflux](https://miniflux.app) instance to Home
 
    Polling interval is configurable in the integration's **Options** (default 5 minutes).
 
+### Lovelace card bundle
+
+The integration ships a JS card bundle (`custom_components/miniflux/frontend/miniflux-cards.js`) with two Lovelace cards: `custom:miniflux-feed-manager-card` (full feed CRUD) and `custom:miniflux-category-manager-card` (full category CRUD, including empty categories). Add either from a dashboard's "+ Add Card" picker — both are zero-config (they auto-detect this integration's single instance).
+
+- **Storage-mode dashboards (the default):** nothing to do — the integration auto-registers the bundle as a Lovelace resource on setup, cache-busted per version. No manual "Add Resource" step, ever.
+- **YAML-mode dashboards** (`lovelace: mode: yaml` in `configuration.yaml`): resources can't be added programmatically. Add this line yourself under `lovelace: resources:`:
+
+  ```yaml
+  lovelace:
+    resources:
+      - url: /miniflux/frontend/miniflux-cards.js?v=0.1.0
+        type: module
+  ```
+
+  Bump the `?v=` query to the installed integration version after each upgrade so your browser doesn't serve a stale cached bundle.
+
 ## Part 2 — Webhook (real-time new-entry events)
 
 The order below matters: Miniflux only generates the webhook secret **after** you save the URL, so this is a two-step round trip.

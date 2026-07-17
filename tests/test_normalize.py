@@ -75,3 +75,17 @@ class TestFeedFromJson:
         feed = normalize.feed_from_json(_load("feed_no_category.json"))
         assert feed.category_id is None
         assert feed.category_title is None
+
+
+class TestCategoryFromJson:
+    def test_maps_id_and_title(self):
+        category = normalize.category_from_json({"id": 100, "title": "News"})
+        assert category.id == 100
+        assert category.title == "News"
+
+    def test_feed_count_and_unread_are_always_none(self):
+        """G1/D-7: this call carries no snapshot to join against -- the
+        service layer fills these in, never this module."""
+        category = normalize.category_from_json({"id": 100, "title": "News"})
+        assert category.feed_count is None
+        assert category.unread is None

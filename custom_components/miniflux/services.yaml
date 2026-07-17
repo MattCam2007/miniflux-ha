@@ -140,6 +140,13 @@ get_feeds:
       selector:
         boolean:
 
+get_categories:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        text:
+
 update_entries:
   fields:
     config_entry_id:

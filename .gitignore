@@ -217,3 +217,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend subtree (D-5) -- node_modules and TS build info only; the built
+# custom_components/miniflux/frontend/miniflux-cards.js bundle IS committed.
+frontend/node_modules/
+frontend/*.tsbuildinfo
+frontend/coverage/

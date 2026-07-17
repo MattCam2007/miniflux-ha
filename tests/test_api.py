@@ -17,7 +17,7 @@ import pytest
 from custom_components.miniflux import errors
 from custom_components.miniflux.api import MinifluxClient
 from custom_components.miniflux.const import API_AUTH_HEADER
-from custom_components.miniflux.models import Feed
+from custom_components.miniflux.models import Category, Feed
 from tests.fake_aiohttp import FakeResponse, FakeSession
 
 BASE_URL = "https://reader.example.lan"
@@ -709,13 +709,27 @@ class TestFeedAdmin:
 
 
 class TestCategoryAdmin:
-    async def test_get_categories_returns_raw_list(self):
+    async def test_get_categories_returns_typed_list(self):
         session = FakeSession([FakeResponse(200, json_body=[{"id": 100, "title": "News"}])])
         client = _client(session)
 
         result = await client.get_categories()
 
-        assert result == [{"id": 100, "title": "News"}]
+        assert result == [Category(id=100, title="News", feed_count=None, unread=None)]
+
+    async def test_get_categories_includes_zero_feed_categories(self):
+        """The whole reason G1 exists: an empty category is only ever
+        observable via this live call, never via the feed-derived snapshot."""
+        categories = [{"id": 100, "title": "News"}, {"id": 200, "title": "Empty"}]
+        session = FakeSession([FakeResponse(200, json_body=categories)])
+        client = _client(session)
+
+        result = await client.get_categories()
+
+        assert [c.id for c in result] == [100, 200]
+        assert session.calls[0].url == f"{BASE_URL}/v1/categories"
+        assert session.calls[0].method == "GET"
+        assert session.calls[0].kwargs["params"] is None
 
     async def test_create_category_returns_new_id(self):
         session = FakeSession([FakeResponse(201, json_body={"id": 200, "title": "Tech"})])

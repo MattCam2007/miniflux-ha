@@ -62,6 +62,7 @@ Event payloads are compact projections (no article body, capped entry lists) —
 | `miniflux.count_entries` | Cheap pre-flight count with the same filter contract |
 | `miniflux.get_entries` | Hydrate specific entries by id (the event-to-content bridge) |
 | `miniflux.get_feeds` | List feeds, optionally filtered by category or parsing errors |
+| `miniflux.get_categories` | List every category, including empty ones (feed_count/unread as of last poll) |
 | `miniflux.update_entries` | Declarative status/starred update over an explicit id list |
 | `miniflux.mark_all_read` | Mark a whole feed/category/instance as read (the human "inbox zero" action) |
 | `miniflux.create_feed` / `update_feed` / `delete_feed` | Feed management |
@@ -71,6 +72,17 @@ Event payloads are compact projections (no article body, capped entry lists) —
 | `miniflux.export_opml` / `import_opml` | Back up or bulk-load your feed list |
 
 Every service validates its input before making any HTTP call and fails loudly (a bad filter or an unreachable server surfaces as a real error in the calling script's trace, never a silent empty result). Full field reference is in each service's description in the HA UI (Developer Tools → Actions), sourced from `services.yaml`/`strings.json`.
+
+## Dashboard cards
+
+The integration ships two Lovelace cards, auto-registered on setup (no manual resource step on storage-mode dashboards — see [`docs/setup.md`](docs/setup.md#lovelace-card-bundle)):
+
+| Card | Type | Does |
+|---|---|---|
+| Feed Manager | `custom:miniflux-feed-manager-card` | Full feed CRUD: add via discovery, edit, delete, refresh, mark-read, enable/disable |
+| Category Manager | `custom:miniflux-category-manager-card` | Full category CRUD including empty categories, cascade-aware delete, mark-read |
+
+Both are zero-config (single-instance auto-detected) and management surfaces only — no entry/article content is rendered by either card. Frontend source lives in the isolated [`frontend/`](frontend/) subtree; see [`frontend/README.md`](frontend/README.md) for its own build/test commands.
 
 ## Known limitations
 

@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.miniflux import errors
@@ -167,6 +168,29 @@ class TestSetup:
             await hass.async_block_till_done()
 
         assert entry.runtime_data.coordinator.server_version == "2.1.0"
+
+
+class TestFrontendRegistration:
+    """F-U1: async_setup_entry actually wires up frontend.async_register_frontend.
+
+    Detailed branch coverage (YAML mode, no-lovelace, version bump) lives in
+    tests/test_frontend.py; this class is the end-to-end wiring proof.
+    """
+
+    async def test_setup_registers_static_path_and_lovelace_resource(self, hass):
+        from homeassistant.components.lovelace.const import LOVELACE_DATA
+
+        await async_setup_component(hass, "http", {})
+        await async_setup_component(hass, "lovelace", {})
+
+        entry = _make_entry(hass)
+        with _patched_client(feeds=[]):
+            await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+
+        assert hass.data[DOMAIN]["frontend_static_path_registered"] is True
+        items = hass.data[LOVELACE_DATA].resources.async_items()
+        assert any(item["url"].startswith("/miniflux/frontend/miniflux-cards.js") for item in items)
 
 
 class TestUnload:
