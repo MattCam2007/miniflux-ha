@@ -32,9 +32,9 @@ This guide wires a self-hosted [Miniflux](https://miniflux.app) instance to Home
 
 ### Lovelace card bundle
 
-The integration ships a JS card bundle (`custom_components/miniflux/frontend/miniflux-cards.js`) for the dashboard cards it will add in later phases (feed manager, category manager, etc.).
+The integration ships a JS card bundle (`custom_components/miniflux/frontend/miniflux-cards.js`) with two Lovelace cards: `custom:miniflux-feed-manager-card` (full feed CRUD) and `custom:miniflux-category-manager-card` (full category CRUD, including empty categories). Add either from a dashboard's "+ Add Card" picker — both are zero-config (they auto-detect this integration's single instance).
 
-- **Storage-mode dashboards (the default):** nothing to do — the integration auto-registers it as a Lovelace resource on setup, cache-busted per version. No manual "Add Resource" step, ever.
+- **Storage-mode dashboards (the default):** nothing to do — the integration auto-registers the bundle as a Lovelace resource on setup, cache-busted per version. No manual "Add Resource" step, ever.
 - **YAML-mode dashboards** (`lovelace: mode: yaml` in `configuration.yaml`): resources can't be added programmatically. Add this line yourself under `lovelace: resources:`:
 
   ```yaml

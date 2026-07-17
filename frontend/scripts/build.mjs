@@ -13,6 +13,10 @@ export const BUILD_OPTIONS = {
   legalComments: "none",
   sourcemap: false,
   logLevel: "info",
+  // Lit checks this to decide whether to include its dev-mode warnings
+  // (e.g. "Lit is in dev mode. Not recommended for production!") --
+  // without it esbuild has no NODE_ENV at all, so Lit defaults to dev mode.
+  define: { "process.env.NODE_ENV": '"production"' },
 };
 
 export const OUT_FILE = path.resolve(

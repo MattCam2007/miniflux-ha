@@ -73,6 +73,17 @@ Event payloads are compact projections (no article body, capped entry lists) —
 
 Every service validates its input before making any HTTP call and fails loudly (a bad filter or an unreachable server surfaces as a real error in the calling script's trace, never a silent empty result). Full field reference is in each service's description in the HA UI (Developer Tools → Actions), sourced from `services.yaml`/`strings.json`.
 
+## Dashboard cards
+
+The integration ships two Lovelace cards, auto-registered on setup (no manual resource step on storage-mode dashboards — see [`docs/setup.md`](docs/setup.md#lovelace-card-bundle)):
+
+| Card | Type | Does |
+|---|---|---|
+| Feed Manager | `custom:miniflux-feed-manager-card` | Full feed CRUD: add via discovery, edit, delete, refresh, mark-read, enable/disable |
+| Category Manager | `custom:miniflux-category-manager-card` | Full category CRUD including empty categories, cascade-aware delete, mark-read |
+
+Both are zero-config (single-instance auto-detected) and management surfaces only — no entry/article content is rendered by either card. Frontend source lives in the isolated [`frontend/`](frontend/) subtree; see [`frontend/README.md`](frontend/README.md) for its own build/test commands.
+
 ## Known limitations
 
 - **No tag support.** Stock Miniflux has no API to write tags, so this integration doesn't expose one — and won't grow one via workarounds. The full engagement surface stock Miniflux supports is read state, starred, and the save-entry event, and that's what this integration carries end to end.

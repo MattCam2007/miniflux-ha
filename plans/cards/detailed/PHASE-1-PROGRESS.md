@@ -3,72 +3,69 @@
 **Last updated:** 2026-07-17
 **Scope:** the Phase 1 build described in [`00-START-HERE.md`](./00-START-HERE.md) — Foundation → `G2` → C3 feed manager → `G1` → C4 category manager. Nothing here touches Phase 2 (reader, search, triage, health, OPML, activity, rich-content).
 
-This file tracks Phase 1 specifically. `STATUS.md` at the repo root remains the ground-truth snapshot for the backend (services/sensors/webhook) that shipped before this frontend work started.
+This file tracks Phase 1 specifically. `STATUS.md` at the repo root remains the ground-truth snapshot for the backend; this file is the equivalent snapshot for the frontend + the two Phase 1 backend gaps.
 
 ---
 
-## Done: `F-U1` — bundle scaffolding, build, delivery (step 1 of 19)
+## Done: all 19 steps of the build order
 
-The delivery **spike** required by D-9 before any other foundation unit — prove the whole in-repo delivery mechanism works before writing 12 more units on top of it. **Stopped here on purpose** for a real-HA validation pass before continuing, per the build instructions.
+Every step in [`00-START-HERE.md` §2](./00-START-HERE.md#2-phase-1--the-exact-build-order) is complete and merged to this branch.
 
-**What was built:**
-
-- `frontend/` — a self-contained TypeScript + [Lit](https://lit.dev) subtree (D-5): its own `package.json`, `tsconfig.json`, esbuild build script, Vitest smoke test. Zero intermingling with the Python tree.
-- `frontend/src/spike-card.ts` — a throwaway `<miniflux-spike-card>` custom element. **Not** a Phase 1 feature card — its only job is to render something visible in a real dashboard so the delivery pipeline can be confirmed end-to-end by looking at it, not just by reading test output. Delete it once C3/C4 exist and the real-HA pass is done.
-- `custom_components/miniflux/frontend/miniflux-cards.js` — the committed, built bundle (15.8 kB, self-contained — Lit is bundled in, no CDN fetches, CSP-clean).
-- `custom_components/miniflux/frontend.py` — the one integration-code change:
-  - Registers `/miniflux/frontend/*` as a static path once per HA run (idempotent across reloads/restarts).
-  - Auto-adds the bundle as a Lovelace **module** resource on storage-mode dashboards, with a `?v=<integration version>` cache-buster; reconciles in place on version bumps (same resource id, new URL) rather than duplicating.
-  - YAML-mode dashboards can't be edited programmatically — logs and points at the manual resource line now documented in `docs/setup.md`.
-  - No lovelace loaded / lovelace component missing → both degrade to a no-op, never an exception.
-- Wired into `custom_components/miniflux/__init__.py`: `async_setup_entry` now calls `async_register_frontend(hass)` alongside service/webhook registration.
-- Tests: `tests/test_frontend.py` (9 focused cases — static path registered once, resource created/not duplicated/updated in place on version bump, YAML-mode skip, no-lovelace skip, lovelace-unimportable skip) plus a wiring-proof case added to `tests/test_init.py`. `frontend.py` is at **100% line+branch coverage**.
-- CI: `.github/workflows/test.yml` gained a `frontend` job — `npm ci` → `typecheck` → `npm test` (Vitest, `happy-dom`) → `check-bundle-fresh` (fails if the committed bundle doesn't byte-match a fresh `npm run build`, so a stale bundle can never ship).
-- `docs/setup.md` — new "Lovelace card bundle" subsection under Part 1, documenting the storage-mode zero-config behavior and the YAML-mode manual resource line.
-
-**Full suite status at this commit:** 458 Python tests passing, all 20 covered backend modules at their required floor (frontend.py and every pure-core module at 100%, api.py at its pre-existing accepted 99%). Frontend: typecheck clean, Vitest smoke test passing, bundle byte-matches a fresh build.
-
-**What is explicitly NOT proven yet — this is the gate before continuing:**
-- The integration has never loaded inside a **real** Home Assistant. Every check above ran against `pytest-homeassistant-custom-component`'s simulated harness or Vitest's `happy-dom` — high-fidelity, but simulated.
-- Whether `async_register_frontend` actually wins the component-load-order race in a real HA boot (lovelace being ready by the time this integration's config entry sets up) has only been exercised by explicitly setting up `http`+`lovelace` first in tests — real HA's own boot ordering hasn't been observed.
-- Whether the `<miniflux-spike-card>` genuinely shows up in the "+ Add Card" picker with zero manual resource setup, on a real storage-mode dashboard, has not been visually confirmed.
-- GitHub Actions hasn't run the new `frontend` CI job or re-run `hassfest`/HACS validation against these changes yet.
-
-**This is the checkpoint:** add the card to a real dashboard, confirm it renders, confirm no manual resource step was needed, then say so — that's what unblocks step 2.
-
----
-
-## Not started: steps 2–19
-
-Everything below `F-U1` in the [build order](./00-START-HERE.md#2-phase-1--the-exact-build-order) is **not started**. Listed here so it's obvious what "the rest of Phase 1" actually is — this is not a status claim, just the plan's own table for reference:
-
-| Step | Unit | One-line purpose |
+| Step | Unit | What shipped |
 |---|---|---|
-| 2 | `F-U2` | Vitest harness + `FakeHass` — the permanent frontend test rig everything after this depends on |
-| 3 | `G2` | Backend: per-feed unread count joined onto `get_feeds` from the poll snapshot |
-| 4 | `G1` | Backend: new `get_categories` service (including empty categories) |
-| 5 | `F-U3` | `MinifluxApi` config-entry auto-resolution |
-| 6 | `F-U4` | Typed service wrappers (12 of the 17 services Phase 1 needs) |
-| 7 | `F-U5` | Chunking, error normalization, request generations |
-| 8 | `F-U6` | `MinifluxStore` cache + keys + isolation |
-| 9 | `F-U7` | Refresh bus (poll-tick + admin event + local mutation invalidation) |
-| 10 | `F-U8` | Optimistic layer + rollback |
-| 11 | `F-U9` | `<mf-confirm>` (two-step, plus hold-to-confirm variant) |
-| 12 | `F-U10` | `<mf-feed-picker>` / `<mf-category-picker>` |
-| 13 | `F-U11` | Offline banner, truncation notice, toast host |
-| 14 | `F-U12` | Virtualized list (500+ row case) |
-| 15 | `F-U13` | Card registration + shared editor base |
-| 16 | `C3-U1..U5` | **Feed manager card** — create (discover), read, update, delete, refresh, mark-read, enable/disable |
-| 17 | `C4-U1..U4` | **Category manager card** — create, read (incl. empty), rename, delete (hold-to-confirm) |
-| 18 | `F-U14` | Bundle smoke + no-leak check (only intended globals/elements exposed) |
-| 19 | Real-HA validation | The full Phase 1 "done" gate — [`00-START-HERE.md` §3](./00-START-HERE.md#3-phase-1-done-gate-real-ha-validation--d-2) |
+| 1 | `F-U1` | Bundle scaffolding + delivery: `frontend/` subtree (D-5), static path + auto Lovelace resource registration (`custom_components/miniflux/frontend.py`). **Validated in a real HA** before the rest of the build continued (D-9). |
+| 2 | `F-U2` | Vitest harness: `FakeHass` (scriptable `callService`/`subscribeEvents`, entity registry, `is_admin`), `fixture()` Lit mount helper, per-file coverage-floor gate (`frontend/scripts/check-coverage-floors.mjs`), wired into CI. |
+| 3 | `G2` | `get_feeds` joins each feed's unread count from the coordinator's polled snapshot ("as of last poll"); absent from the snapshot → `0`, never `null`, never a live counters fetch (D-6). |
+| 4 | `G1` | New `get_categories` service: live `GET /v1/categories` (the only way an empty category is ever observable — the poll snapshot is feed-derived and structurally can't represent one), `feed_count`/`unread` joined from the snapshot where available, `null` when unknown (D-7). Also corrected a stale `strings.json` description that claimed category delete doesn't cascade — it does (D-4). |
+| 5 | `F-U3` | `resolveConfigEntryId`: scans the entity registry for `platform: "miniflux"` entities; single instance auto-resolves (D-3), zero/multiple are typed errors, cached by `hass.entities` object identity. |
+| 6 | `F-U4` | `MinifluxApi`: one typed method per Phase 1 service (`get_feeds`, `get_categories`, `count_entries`, `create_feed`, `update_feed`, `delete_feed`, `refresh_feed`, `refresh_all_feeds`, `discover_feeds`, `mark_all_read`, `create_category`, `update_category`, `delete_category`) over `hass.callService`'s WS `call_service` path. Every call threads `config_entry_id` explicitly (D-3's live seam). `returnResponse` gated per-service against HA's actual `SupportsResponse` registration (verified against HA core source — passing `true` for a `NONE`-response service raises `ServiceValidationError`). |
+| 7 | `F-U5` | Error normalization (`MinifluxApiError` / `{message, retriable}`), with the retriable split verified against HA core's WS `call_service` error-code mapping (`service_validation_error`/`invalid_format`/`not_found` are caller mistakes, never retriable). `GenerationGuard` for dropping stale in-flight responses. Entry-query chunking skipped — Phase 1 has no `get_entries`/`update_entries` wrapper to chunk. |
+| 8 | `F-U6` | `QueryCache`: order-independent keys always scoped by `config_entry_id` (S7's seam); long/short TTL tiers (Phase 1 only uses the long tier). |
+| 9 | `F-U7` | `RefreshBus`: admin bus events on the 4 `miniflux_*` types, debounced ≥2s; entity-tick fallback (`onHassUpdate`, called from a card's own `hass` setter — **not** a websocket subscription, see the design-correction commit); local mutations invalidate immediately. A non-admin `subscribeEvents` call rejects (`Unauthorized`, matches HA core) rather than silently no-op'ing. |
+| 10 | `F-U8` | `applyOptimisticPatch`: patches every cache key holding the affected row across all mounted views in one frame, reverts to the exact prior value on failure. Used by C3's feed rename and enable/disable, and C4's category rename — everything else stays non-optimistic (pending + re-query). |
+| 11 | `F-U9` | `<mf-confirm>`: two-step confirm with a real blast-radius message; `require-hold` swaps the confirm button for a press-and-hold variant (releasing early cancels with no effect). |
+| 12 | `F-U10` | `<mf-feed-picker>` / `<mf-category-picker>`: share a `MinifluxStore` cache across instances (no duplicate fetch), emit id or title per config, empty categories select like any other. Category picker's inline "+ New category…" surfaces `create_category` and re-queries. |
+| 13 | `F-U11` | `<mf-offline>` (bound to `binary_sensor.miniflux_reachable`), `<mf-truncation-notice>`, `<mf-toast-host>` (imperative `.show()`, Undo cancels the auto-dismiss timer). |
+| 14 | `F-U12` | `<mf-virtual-list>`: fixed-row-height windowing for 500+ rows; reads the card's own `height` config as viewport size rather than measuring real DOM layout; never writes `scrollTop` itself, so appends can't disturb scroll position. |
+| 15 | `F-U13` | `registerCard()` (shared `window.customCards` push) and `MfCardEditorBase` (owns the `config_entry_id` picker, hidden except with a genuine multi-instance setup; HA's standard `config-changed` event contract). |
+| 16 | `C3-U1..U5` | `<miniflux-feed-manager-card>` — full feed CRUD, add-feed wizard (discover or direct URL), edit sheet (dirty-fields-only), row actions (refresh/mark-read/enable-disable/delete), 500-feed virtualization. See below for the two real bugs found and fixed while testing this unit. |
+| 17 | `C4-U1..U4` | `<miniflux-category-manager-card>` — full category CRUD including empty categories, cascade-aware delete (`require_hold` defaults **true**, unlike C3's feed delete), mark-read, expand-to-feeds. |
+| 18 | `F-U14` | Bundle no-leak check: asserts the built bundle registers exactly the intended custom elements, adds nothing to `window` beyond `customCards` (and Lit's own version-tracking globals, which are expected), and issues no network request at import. The throwaway `<miniflux-spike-card>` from the `F-U1` spike is deleted. |
+| 19 | Real-HA validation | **Not done yet — see "What's left" below.** This is the gate before any release. |
 
-None of this is built. The `<miniflux-spike-card>` currently in the bundle is **not** C3 or C4 — it is scaffolding that gets deleted once those exist.
+**Test counts at this commit:** 469 backend (Python) tests, 241 frontend (Vitest) tests — 710 total, all green. Every runtime file (`src/api/`, `src/store/`, `src/atoms/`, `src/lib/`) is at its **100%** line+branch coverage floor; every card/view file (`src/cards/`) is at its **90%** floor (most are at or near 100% anyway). Backend: `services.py`, `api.py`, `normalize.py`, `models.py` all at 100%, matching the pre-existing bar. Bundle: 57.0kb, self-contained (Lit bundled in, no CDN fetches), production build (Lit dev-mode warnings stripped).
 
-## Explicitly out of scope for all of Phase 1 (not just this step)
+### Two real bugs found and fixed while building C3 (worth knowing about)
 
-Per D-1: the reader, search, triage, health, OPML, and activity cards, and the rich-content pipeline. Also deferred: backend gaps `G3` (offset), `G5` (enclosures), `G6` (feed icons — so C3/C4 render **no favicons**, letter-avatar or nothing), `G7` (readability), `G8` (comments_url). None of this changes until Phase 1 ships and is validated.
+Writing tests against the *intended* behavior — not the code as first written — caught two genuine bugs before they shipped:
 
-## What "done" looks like for all of Phase 1
+1. **Optimistic rename didn't actually render optimistically.** The cache patch landed correctly, but the card's own `_feeds` state (what actually renders) was only refreshed *after* the mutation resolved — so the "instant" rename wasn't instant. Fixed by patching the card's local state in parallel with the cache.
+2. **Stale-closure clobbering in the edit sheet.** Each field's `@change` handler closed over a destructured snapshot of `_editing` taken at render time. Two field edits landing before Lit's next render flushed would silently overwrite each other (edit title, then immediately toggle a checkbox → the title edit vanishes). Fixed with a small `_updateEditing()` helper that always merges into the *current* `_editing`, never a stale local.
 
-The full gate is [`00-START-HERE.md §3`](./00-START-HERE.md#3-phase-1-done-gate-real-ha-validation--d-2) — cards in the picker with zero manual resource setup, full CRUD reachable on both cards with zero gaps, unread badges reflecting the last poll, honest offline degradation, and CI green (hassfest/HACS + JS build/freshness + JS and Python tests + coverage floors). Only after that gate does the maintainer decide whether to cut a release.
+### Descoped on purpose (not silently dropped)
+
+- **C4's "by_category sensor-attribute first paint" optimization** (instant paint from the existing sensor attribute, reconciled once the real `G1` query lands) — a perceived-performance nicety with no functional gap if skipped; the card renders correctly either way, just from `G1` alone.
+- **C4's "tap unread count → push a category filter to a co-located C2"** — C2 (the reader card) doesn't exist until Phase 2, so there is no consumer for this bus event yet.
+
+---
+
+## What's left
+
+### 1. Real-HA validation (step 19) — the actual gate
+
+Nothing below has been checked against a genuine running Home Assistant yet:
+
+- [ ] Both cards appear in the "+ Add Card" picker with zero manual resource setup on a storage-mode dashboard.
+- [ ] C3: add a feed via discovery, edit every mutable field, delete (confirm + real count), refresh, mark-read, enable/disable — all reachable, zero gaps.
+- [ ] C4: create, rename, delete an **empty** category, delete a category **with** feeds (confirm the cascade actually happens and the hold-to-confirm gesture works on a touchscreen/mouse, not just synthetic test events), mark-read.
+- [ ] Unread badges (C3) update on a real poll tick without a page reload.
+- [ ] Pull Miniflux's network access and confirm both cards degrade honestly (offline banner, actions disabled) and recover without a reload.
+- [ ] GitHub Actions CI green on this branch: hassfest/HACS validation, Python tests + coverage floors, JS build + bundle-freshness, JS tests + coverage floors. (All of this passes locally; it has not been observed running on GitHub's own runners yet.)
+
+### 2. Everything Phase 2 (explicitly out of scope until Phase 1 ships and validates — D-1)
+
+The reader (C2), search (C6), triage (C7), health (C5), OPML (C8), and activity (C9) cards; the rich-content pipeline (`RC-U*`); backend gaps `G3` (offset pagination), `G5` (enclosures), `G6` (feed icons — so C3/C4 keep showing monogram avatars, not real favicons, until this lands), `G7` (readability full-text), `G8` (`comments_url`). The content-rendering decisions (sanitizer, images, embeds) are explicitly not yet made and get hashed out when Phase 2 starts.
+
+### 3. After the real-HA gate passes
+
+Cutting a release is the maintainer's call (per `STATUS.md`) — not automatic once the gate passes.
